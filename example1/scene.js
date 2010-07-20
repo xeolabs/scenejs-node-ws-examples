@@ -1,4 +1,11 @@
-
+/*--------------------------------------------------------------------------------------------------
+ *
+ * Template for getting started with the SceneJS.Socket node in SceneJS V0.7.6
+ *
+ * Lindsay Kay
+ * July 20, 2010
+ * lindsay.kay@xeolabs.com
+ *--------------------------------------------------------------------------------------------------*/
 var exampleScene = SceneJS.scene({
     canvasId: "theCanvas",
     loggingElementId: "theLoggingDiv" },
@@ -59,11 +66,33 @@ var exampleScene = SceneJS.scene({
                                              */
                                             messages: [
                                                 {
-                                                    cmd: "helloSocket"
+                                                    cmd: "createTeapot"
+                                                },
+
+                                                {
+                                                    cmd: "rotateTeapot"
                                                 }
+
+                                                //  ,
+                                                //  {
+                                                //       cmd: "destroyTeapot"
+                                                //  }
                                             ],
 
                                             listeners: {
+
+                                                "msg-sent" : {
+                                                    fn: function(theNode, message) {
+                                                        //alert(JSON.stringify(message));
+                                                    }
+                                                },
+
+                                                "msg-received" : {
+                                                    fn: function(theNode, message) {
+                                                        //alert(JSON.stringify(message.body.configs));
+                                                    }
+                                                },
+
                                                 "state-changed" : {
                                                     fn: function(theNode, params) {
                                                         switch (params.newState) {
@@ -72,15 +101,15 @@ var exampleScene = SceneJS.scene({
                                                                 break;
 
                                                             case SceneJS.Socket.STATE_OPEN:
-                                                               //  alert("STATE_OPEN");
+                                                                //  alert("STATE_OPEN");
                                                                 break;
 
                                                             case SceneJS.Socket.STATE_CLOSED:
-                                                               //  alert("STATE_CLOSED");
+                                                                //  alert("STATE_CLOSED");
                                                                 break;
 
                                                             case SceneJS.Socket.STATE_ERROR:
-                                                                // alert("STATE_ERROR: " + params.exception.message);
+                                                                //  alert("STATE_ERROR: " + params.exception.message);
                                                                 break;
                                                         }
                                                     }
@@ -90,11 +119,11 @@ var exampleScene = SceneJS.scene({
                                                 SceneJS.node({ sid: "world-root" })
 
                                                 ) // Socket
-                                        )
-                                )
-                        )
-                )
-        );
+                                        )  // material
+                                ) // lights
+                        ) // camera
+                ) // lookAt
+        ); // scene
 
 
 /*----------------------------------------------------------------------
@@ -102,8 +131,8 @@ var exampleScene = SceneJS.scene({
  *---------------------------------------------------------------------*/
 
 SceneJS.setDebugConfigs({
-    webgl: {
-        trace: false
+    sockets: {
+        trace: true
     }
 });
 

@@ -3,8 +3,8 @@
  */
 
 var sys = require("sys");
-var log = require('../lib/log').log;
-var ws = require('../lib/ws');
+var log = require('../libs/log').log;
+var ws = require('../libs/ws');
 var url = require('url');
 var qs = require('querystring');
 
