@@ -15,54 +15,8 @@ var server = ws.createServer({
     debug: true
 });
 
-function createTeapot() {
-     
-    return '{' +
-           '    configs: {'   +
-           '        "#world-root": {' +
-           '            "+node" : SceneJS.node({ sid: "teapot" },' +
-           '                    SceneJS.translate(' +
-           '                        SceneJS.rotate({' +
-           '                               sid: "rotate",' +
-           '                                angle: 0,' +
-           '                                y : 1.0' +
-           '                            },' +
-           '                            SceneJS.objects.teapot())))' +
-           '        }' +
-           '    }' +
-           '}';
-////
-//     return '{' +
-//           '    configs: {'   +
-//           '        "#world-root": { "+node" : SceneJS.translate(new SceneJS.objects.Teapot()) } '+
-//           '    }' +
-//           '}';
-}
-
-function rotateTeapot() {
-    return '{' +
-           '    configs: {' +
-           '        "#teapot": {' +
-           '            "#rotate" : {' +
-           '                angle: 45' +
-           '            }' +
-           '        }' +
-           '    }' +
-           '}';
-}
-
-function destroyTeapot() {
-    return '{' +
-           '    configs: {' +
-           '        "#world-root": {' +
-           '             "-node" : "teapot"' +
-           '        }' +
-           '    }' +
-           '}';
-}
-
-function createMessage(body) {
-    return body;
+function createMessage(msg) {
+    return "{ body: " + msg + "}";
 }
 
 function createErrorMessage(code, msg) {
@@ -89,19 +43,49 @@ server.addListener("connection", function(conn) {
                             var responseMsg;
 
                             if (!params.cmd) {
-                                responseMsg = createErrorMessage(501, "I need a cmd!");               
+                                responseMsg = createErrorMessage(501, "I need a cmd!");
                             } else {
                                 switch (params.cmd) {
                                     case "createTeapot" :
-                                        responseMsg = createMessage(createTeapot());
+                                        responseMsg = createMessage(
+                                                '   { ' +
+                                                '        configs: {' +
+                                                '            "#world-root": {' +
+                                                '                "+node" : SceneJS.node({ sid: "teapot" },' +
+                                                '                        SceneJS.translate(' +
+                                                '                            SceneJS.rotate({' +
+                                                '                                   sid: "rotate",' +
+                                                '                                    angle: 0,' +
+                                                '                                    y : 1.0' +
+                                                '                                },' +
+                                                '                                SceneJS.objects.teapot())))' +
+                                                '            }' +
+                                                '       }' +
+                                                '   }');
                                         break;
 
                                     case "rotateTeapot" :
-                                        responseMsg = createMessage(rotateTeapot());
+                                        responseMsg = createMessage(
+                                                '   { ' +
+                                                '       configs: {' +
+                                                '            "#teapot": {' +
+                                                '                "#rotate" : {' +
+                                                '                    angle: 45' +
+                                                '                 }' +
+                                                '            }' +
+                                                '       }' +
+                                                '   }');
                                         break;
 
                                     case "destroyTeapot" :
-                                        responseMsg = createMessage(destroyTeapot());
+                                        responseMsg = createMessage(
+                                                '   { ' +
+                                                '       configs: {' +
+                                                '            "#world-root": {' +
+                                                '                 "-node" : "teapot"' +
+                                                '            }' +
+                                                '       } ' +
+                                                '   }');
                                         break;
 
                                     default:
@@ -109,14 +93,11 @@ server.addListener("connection", function(conn) {
                                         break;
                                 }
                             }
+                             //   log("<" + conn._id + "> Responding with: " + responseMsg);
                             server.send(conn._id, responseMsg);
-                         //   log("<" + conn._id + "> Responding with: " + responseMsg);
-
-
-
                         },
                         function(error) {
-                          //  log("<" + conn._id + "> ERROR handling request: " + error.error + " : " + error.message);
+                            log("<" + conn._id + "> ERROR handling request: " + error.error + " : " + error.message);
                             server.send(conn._id, JSON.stringify(error));
                         });
             });
