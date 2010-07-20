@@ -1,6 +1,4 @@
-/*
- * WebSocket front-end for the asset service 
- */
+
 
 var sys = require("sys");
 var log = require('../libs/log').log;
