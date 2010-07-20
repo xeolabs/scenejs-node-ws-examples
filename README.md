@@ -1,4 +1,4 @@
-# Node.JS WebSocket Examples with SceneJS
+# Node.JS WebSocket Examples for SceneJS
 
 The SceneJs.Socket node enables a server to dynamically participate in the construction,
 destruction and configuration of its subgraph. It binds its subgraph to a WebSocket
