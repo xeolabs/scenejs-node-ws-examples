@@ -18,7 +18,7 @@ these examples as I figure out what it's meant to be!
 All the examples run through the same WebSocket server.
 Start the server like this:
 
-node example1/server.js
+node server.js
 
 To run the first example, point your browser at example1/index.html.
 
