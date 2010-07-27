@@ -1,3 +1,20 @@
+/*
+ * SceneJS WebGL Scene Graph Library for JavaScript
+ * http://scenejs.org/
+ * Dual licensed under the MIT or GPL Version 2 licenses.
+ * http://scenejs.org/license
+  * Copyright 2010, Lindsay Kay
+ *
+ * Includes WebGLTrace
+ * Various functions for helping debug WebGL apps.
+ * http://github.com/jackpal/webgltrace
+ * Copyright (c) 2009 The Chromium Authors. All rights reserved.
+ *
+ * Includes WebGL-Debug
+ * Various functions for helping debug WebGL apps.
+ * http://khronos.org/webgl/wiki/Debugging
+ * Copyright (c) 2009 The Chromium Authors. All rights reserved. 
+ */
 /**
  * @class SceneJS
  * SceneJS name space
@@ -7,7 +24,7 @@ var SceneJS = {
 
     /** Version of this release
      */
-    VERSION: '0.7.6.1',
+    VERSION: '0.7.6.2',
 
     /** Names of supported WebGL canvas contexts
      */
@@ -1084,7 +1101,7 @@ SceneJS._math_perspectiveMatrix4 = function(fovyrad, aspectratio, znear, zfar) {
     pmin[0] = -pmax[0];
 
     return SceneJS._math_frustumMat4v(pmin, pmax);
-}
+};
 
 /** @private */
 SceneJS._math_transformPoint3 = function(m, p) {
@@ -1095,6 +1112,7 @@ SceneJS._math_transformPoint3 = function(m, p) {
         (m[3] * p[0]) + (m[7] * p[1]) + (m[11] * p[2]) + m[15]
     ];
 }
+
 
 /** @private */
 SceneJS._math_transformPoints3 = function(m, points) {
@@ -1986,7 +2004,9 @@ SceneJS._webgl_Texture2D = function(context, cfg) {
 
         /* Texture from image
          */
-        context.texImage2D(context.TEXTURE_2D, 0, cfg.image, cfg.flipY);
+       context.texImage2D(context.TEXTURE_2D, 0, cfg.image, cfg.flipY);
+
+       // context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, cfg.image);
 
         this.format = context.RGBA;
         this.width = cfg.image.width;
@@ -2425,12 +2445,12 @@ function makeDebugContext(ctx, opt_onErrorFunc) {
         return undefined;
     }
     var buf = 'new ' + arrayType + '( [';
-    for (var i = 0; i < a.length; i++) {
-        if (i > 0 ) {
-            buf += ', ';
-        }
-        buf += a.get(i);
-    }
+    // for (var i = 0; i < a.length; i++) {
+    //     if (i > 0 ) {
+    //         buf += ', ';
+    //     }
+    //     buf += a.get(i);
+    // }
     buf += '] )';
     return buf;
   };
@@ -2444,7 +2464,7 @@ function makeDebugContext(ctx, opt_onErrorFunc) {
             }
             var objectName;
             try {
-            if (arg !== null) {
+            if (arg !== null && arg !== undefined) {
                 objectName = arg[objectNameProperty];
             }
             } catch (e) {
@@ -2575,6 +2595,319 @@ return {
 };
 
 }();
+//Copyright (c) 2009 The Chromium Authors. All rights reserved.
+//Use of this source code is governed by a BSD-style license that can be
+//found in the LICENSE file.
+
+// Various functions for helping debug WebGL apps.
+
+WebGLDebugUtils = function() {
+
+/**
+ * Wrapped logging function.
+ * @param {string} msg Message to log.
+ */
+var log = function(msg) {
+  if (window.console && window.console.log) {
+    window.console.log(msg);
+  }
+};
+
+/**
+ * Which arguements are enums.
+ * @type {!Object.<number, string>}
+ */
+var glValidEnumContexts = {
+
+  // Generic setters and getters
+
+  'enable': { 0:true },
+  'disable': { 0:true },
+  'getParameter': { 0:true },
+
+  // Rendering
+
+  'drawArrays': { 0:true },
+  'drawElements': { 0:true, 2:true },
+
+  // Shaders
+
+  'createShader': { 0:true },
+  'getShaderParameter': { 1:true },
+  'getProgramParameter': { 1:true },
+
+  // Vertex attributes
+
+  'getVertexAttrib': { 1:true },
+  'vertexAttribPointer': { 2:true },
+
+  // Textures
+
+  'bindTexture': { 0:true },
+  'activeTexture': { 0:true },
+  'getTexParameter': { 0:true, 1:true },
+  'texParameterf': { 0:true, 1:true },
+  'texParameteri': { 0:true, 1:true, 2:true },
+  'texImage2D': { 0:true, 2:true, 6:true, 7:true },
+  'texSubImage2D': { 0:true, 6:true, 7:true },
+  'copyTexImage2D': { 0:true, 2:true },
+  'copyTexSubImage2D': { 0:true },
+  'generateMipmap': { 0:true },
+
+  // Buffer objects
+
+  'bindBuffer': { 0:true },
+  'bufferData': { 0:true, 2:true },
+  'bufferSubData': { 0:true },
+  'getBufferParameter': { 0:true, 1:true },
+
+  // Renderbuffers and framebuffers
+
+  'pixelStorei': { 0:true, 1:true },
+  'readPixels': { 4:true, 5:true },
+  'bindRenderbuffer': { 0:true },
+  'bindFramebuffer': { 0:true },
+  'checkFramebufferStatus': { 0:true },
+  'framebufferRenderbuffer': { 0:true, 1:true, 2:true },
+  'framebufferTexture2D': { 0:true, 1:true, 2:true },
+  'getFramebufferAttachmentParameter': { 0:true, 1:true, 2:true },
+  'getRenderbufferParameter': { 0:true, 1:true },
+  'renderbufferStorage': { 0:true, 1:true },
+
+  // Frame buffer operations (clear, blend, depth test, stencil)
+
+  'clear': { 0:true },
+  'depthFunc': { 0:true },
+  'blendFunc': { 0:true, 1:true },
+  'blendFuncSeparate': { 0:true, 1:true, 2:true, 3:true },
+  'blendEquation': { 0:true },
+  'blendEquationSeparate': { 0:true, 1:true },
+  'stencilFunc': { 0:true },
+  'stencilFuncSeparate': { 0:true, 1:true },
+  'stencilMaskSeparate': { 0:true },
+  'stencilOp': { 0:true, 1:true, 2:true },
+  'stencilOpSeparate': { 0:true, 1:true, 2:true, 3:true },
+
+  // Culling
+
+  'cullFace': { 0:true },
+  'frontFace': { 0:true },
+};
+
+/**
+ * Map of numbers to names.
+ * @type {Object}
+ */
+var glEnums = null;
+
+/**
+ * Initializes this module. Safe to call more than once.
+ * @param {!WebGLRenderingContext} ctx A WebGL context. If
+ *    you have more than one context it doesn't matter which one
+ *    you pass in, it is only used to pull out constants.
+ */
+function init(ctx) {
+  if (glEnums == null) {
+    glEnums = { };
+    for (var propertyName in ctx) {
+      if (typeof ctx[propertyName] == 'number') {
+        glEnums[ctx[propertyName]] = propertyName;
+      }
+    }
+  }
+}
+
+/**
+ * Checks the utils have been initialized.
+ */
+function checkInit() {
+  if (glEnums == null) {
+    throw 'WebGLDebugUtils.init(ctx) not called';
+  }
+}
+
+/**
+ * Returns true or false if value matches any WebGL enum
+ * @param {*} value Value to check if it might be an enum.
+ * @return {boolean} True if value matches one of the WebGL defined enums
+ */
+function mightBeEnum(value) {
+  checkInit();
+  return (glEnums[value] !== undefined);
+}
+
+/**
+ * Gets an string version of an WebGL enum.
+ *
+ * Example:
+ *   var str = WebGLDebugUtil.glEnumToString(ctx.getError());
+ *
+ * @param {number} value Value to return an enum for
+ * @return {string} The string version of the enum.
+ */
+function glEnumToString(value) {
+  checkInit();
+  var name = glEnums[value];
+  return (name !== undefined) ? name :
+      ("*UNKNOWN WebGL ENUM (0x" + value.toString(16) + ")");
+}
+
+/**
+ * Returns the string version of a WebGL argument.
+ * Attempts to convert enum arguments to strings.
+ * @param {string} functionName the name of the WebGL function.
+ * @param {number} argumentIndx the index of the argument.
+ * @param {*} value The value of the argument.
+ * @return {string} The value as a string.
+ */ 
+function glFunctionArgToString(functionName, argumentIndex, value) {
+  var funcInfo = glValidEnumContexts[functionName];
+  if (funcInfo !== undefined) {
+    if (funcInfo[argumentIndex]) {
+      return glEnumToString(value);
+    }
+  }
+  return value.toString();
+}
+
+/**
+ * Given a WebGL context returns a wrapped context that calls
+ * gl.getError after every command and calls a function if the
+ * result is not gl.NO_ERROR.
+ *
+ * @param {!WebGLRenderingContext} ctx The webgl context to
+ *        wrap.
+ * @param {!function(err, funcName, args): void} opt_onErrorFunc
+ *        The function to call when gl.getError returns an
+ *        error. If not specified the default function calls
+ *        console.log with a message.
+ */
+function makeDebugContext(ctx, opt_onErrorFunc) {
+  init(ctx);
+  opt_onErrorFunc = opt_onErrorFunc || function(err, functionName, args) {
+        // apparently we can't do args.join(",");
+        var argStr = "";
+        for (var ii = 0; ii < args.length; ++ii) {
+          argStr += ((ii == 0) ? '' : ', ') + 
+              glFunctionArgToString(functionName, ii, args[ii]);
+        }
+        log("WebGL error "+ glEnumToString(err) + " in "+ functionName +
+            "(" + argStr + ")");
+      };
+
+  // Holds booleans for each GL error so after we get the error ourselves
+  // we can still return it to the client app.
+  var glErrorShadow = { };
+
+  // Makes a function that calls a WebGL function and then calls getError.
+  function makeErrorWrapper(ctx, functionName) {
+    return function() {
+      var result = ctx[functionName].apply(ctx, arguments);
+      var err = ctx.getError();
+      if (err != 0) {
+        glErrorShadow[err] = true;
+        opt_onErrorFunc(err, functionName, arguments);
+      }
+      return result;
+    };
+  }
+
+  // Make a an object that has a copy of every property of the WebGL context
+  // but wraps all functions.
+  var wrapper = {};
+  for (var propertyName in ctx) {
+    if (typeof ctx[propertyName] == 'function') {
+      wrapper[propertyName] = makeErrorWrapper(ctx, propertyName);
+     } else {
+       wrapper[propertyName] = ctx[propertyName];
+     }
+  }
+
+  // Override the getError function with one that returns our saved results.
+  wrapper.getError = function() {
+    for (var err in glErrorShadow) {
+      if (glErrorShadow[err]) {
+        glErrorShadow[err] = false;
+        return err;
+      }
+    }
+    return ctx.NO_ERROR;
+  };
+
+  return wrapper;
+}
+
+return {
+  /**
+   * Initializes this module. Safe to call more than once.
+   * @param {!WebGLRenderingContext} ctx A WebGL context. If
+   *    you have more than one context it doesn't matter which one
+   *    you pass in, it is only used to pull out constants.
+   */
+  'init': init,
+
+  /**
+   * Returns true or false if value matches any WebGL enum
+   * @param {*} value Value to check if it might be an enum.
+   * @return {boolean} True if value matches one of the WebGL defined enums
+   */
+  'mightBeEnum': mightBeEnum,
+
+  /**
+   * Gets an string version of an WebGL enum.
+   *
+   * Example:
+   *   WebGLDebugUtil.init(ctx);
+   *   var str = WebGLDebugUtil.glEnumToString(ctx.getError());
+   *
+   * @param {number} value Value to return an enum for
+   * @return {string} The string version of the enum.
+   */
+  'glEnumToString': glEnumToString,
+
+  /**
+   * Converts the argument of a WebGL function to a string.
+   * Attempts to convert enum arguments to strings.
+   *
+   * Example:
+   *   WebGLDebugUtil.init(ctx);
+   *   var str = WebGLDebugUtil.glFunctionArgToString('bindTexture', 0, gl.TEXTURE_2D);
+   *   
+   * would return 'TEXTURE_2D'
+   *
+   * @param {string} functionName the name of the WebGL function.
+   * @param {number} argumentIndx the index of the argument.
+   * @param {*} value The value of the argument.
+   * @return {string} The value as a string.
+   */
+  'glFunctionArgToString': glFunctionArgToString,
+
+  /**
+   * Given a WebGL context returns a wrapped context that calls
+   * gl.getError after every command and calls a function if the
+   * result is not NO_ERROR.
+   *
+   * You can supply your own function if you want. For example, if you'd like
+   * an exception thrown on any GL error you could do this
+   *
+   *    function throwOnGLError(err, funcName, args) {
+   *      throw WebGLDebugUtils.glEnumToString(err) + " was caused by call to" +
+   *            funcName;
+   *    };
+   *
+   *    ctx = WebGLDebugUtils.makeDebugContext(
+   *        canvas.getContext("webgl"), throwOnGLError);
+   *
+   * @param {!WebGLRenderingContext} ctx The webgl context to wrap.
+   * @param {!function(err, funcName, args): void} opt_onErrorFunc The function
+   *     to call when gl.getError returns an error. If not specified the default
+   *     function calls console.log with a message.
+   */
+  'makeDebugContext': makeDebugContext
+};
+
+}();
+
 /**
  * @class Data scope that is passed as the single argument to the callback function that many scene node classes may be
  * dynamically configured through.
@@ -2831,6 +3164,7 @@ SceneJS.Node = function() {
     this._fixedParams = true;
     this._parent = null;
     this._listeners = {};
+    this._events = []; // FIFO queue for each event listener
 
     /* Used by many node types to track the level at which they can
      * memoise internal state. When rendered, a node increments
@@ -3056,37 +3390,43 @@ SceneJS.Node.prototype._renderNodes = function(traversalContext, data, children)
     var child;
     var childConfigs;
     var i;
-    var handle;
-    var savedName;  // Saves SID path for when rendering subgraph of Instance
+    var configUnsetters;
 
+    var savedName;  // Saves SID path for when rendering subgraph of Instance  
     if (this._sidPath) {
         savedName = SceneJS._instancingModule.getName();      // Save SID path at Instance node
-        SceneJS._instancingModule.setName(this._sidPath);     // Initialise empty SID path for Symbol's subgraph
+        SceneJS._instancingModule.setName(this._sidPath, this);     // Initialise empty SID path for Symbol's subgraph
     } else if (this._sid) {
         SceneJS._instancingModule.pushName(this._sid, this);
+    }
+
+    if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
+        SceneJS._pickModule.preVisitNode(this);
     }
 
     children = children || this._children;  // for Selector node
     var numChildren = children.length;
     if (numChildren) {
+        var childTraversalContext;
         for (i = 0; i < numChildren; i++) {
             child = children[i];
-            handle = null;
+            configUnsetters = null;
             childConfigs = traversalContext.configs;
             if (childConfigs && child._sid) {
                 childConfigs = childConfigs[child._sid];
                 if (childConfigs) {
-                    handle = this._setConfigs(childConfigs, traversalContext.configsModes, child, data);
+                    configUnsetters = this._setConfigs(childConfigs, traversalContext.configsModes, child, data);
                 }
             }
-            child._renderWithEvents.call(child, { // Traversal context
+            childTraversalContext = {
                 insideRightFringe: traversalContext.insideRightFringe || (i < numChildren - 1),
                 callback : traversalContext.callback,
                 configs: childConfigs || traversalContext.configs,
                 configsModes : traversalContext.configsModes
-            }, data);
-            if (handle) {
-                this._unsetConfigs(handle);
+            };
+            child._renderWithEvents.call(child, childTraversalContext, data);
+            if (configUnsetters) {
+                this._unsetConfigs(configUnsetters);
             }
         }
     }
@@ -3107,9 +3447,13 @@ SceneJS.Node.prototype._renderNodes = function(traversalContext, data, children)
         }
     }
     if (savedName) {
-        SceneJS._instancingModule.setName(savedName); // Restore SID path for Instance node
+        SceneJS._instancingModule.setName(savedName, this); // Restore SID path for Instance node
     } else if (this._sid) {
         SceneJS._instancingModule.popName();
+    }
+
+    if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
+        SceneJS._pickModule.postVisitNode(this);
     }
 };
 
@@ -3156,6 +3500,7 @@ SceneJS.Node.prototype._renderWithEvents = function(traversalContext, data) {
     if (this._listeners["rendering"]) { // Optimisation
         this._fireEvent("rendering", { });
     }
+    this._processEvents();
     this._render(traversalContext, data);
     if (this._listeners["rendered"]) { // Optimisation
         this._fireEvent("rendered", { });
@@ -3400,7 +3745,9 @@ SceneJS.Node.prototype.addListener = function(eventName, fn, options) {
 };
 
 /**
- * @private
+ * Fires an event at this node
+ * @param {String} eventName Event name
+ * @param {Object} params Event parameters
  */
 SceneJS.Node.prototype._fireEvent = function(eventName, params) {
     var list = this._listeners[eventName];
@@ -3416,11 +3763,35 @@ SceneJS.Node.prototype._fireEvent = function(eventName, params) {
 };
 
 /**
+ * Adds an event to a FIFO queue for the given event type, to be processed when the node is next rendered.
+ * @param {String} eventName Event name
+ * @param {Object} params Event parameters
+ * @return this
+ */
+SceneJS.Node.prototype.addEvent = function(eventName, params) {
+    this._events.unshift({name : eventName, params: params });
+    return this;
+};
+
+
+/**
+ * Processes all events queued on this node
+ * @private
+ */
+SceneJS.Node.prototype._processEvents = function() {
+    var event;
+    while (this._events.length > 0) {
+        event = this._events.pop();
+        this._fireEvent(event.name, event.params);
+    }
+};
+
+/**
  * Removes a handler that is registered for the given event on this node.
  * Does nothing if no such handler registered.
  *
  * @param {String} eventName Event type that handler is registered for
- * @param fn - Handler function that is registered for the event
+ * @param {function} fn - Handler function that is registered for the event
  * @return {function} The handler, or null if not registered
  */
 SceneJS.Node.prototype.removeListener = function(eventName, fn) {
@@ -3435,6 +3806,16 @@ SceneJS.Node.prototype.removeListener = function(eventName, fn) {
         }
     }
     return null;
+};
+
+/**
+ * Returns true if this node has any listeners for the given event .
+ *
+ * @param {String} eventName Event type
+ * @return {boolean} True if listener present
+ */
+SceneJS.Node.prototype.hasListener = function(eventName) {
+    return this._listeners[eventName];
 };
 
 /** Removes all listeners registered on this node.
@@ -3506,8 +3887,10 @@ new (function() {
 
     SceneJS.installModule = function(name, module) {
         try {
-           // alert("installing " + moduleLoading.url);
-            module.init({ baseURL : SceneJS._getBaseURL(moduleLoading.url) });
+           //  alert("installing " + moduleLoading.url + " as " + name);
+            if (module.init) {
+                module.init({ baseURL : SceneJS._getBaseURL(moduleLoading.url) });
+            }
             modules[name] = module;
         } catch (e) {
             throw SceneJS._errorModule.fatalError(
@@ -3544,7 +3927,7 @@ new (function() {
         var newScript = document.createElement('script');
         newScript.type = 'text/javascript';
         newScript.src = moduleLoading.url;
-                // alert("loading " + moduleLoading.url);
+        // alert("loading " + moduleLoading.url);
         headID.appendChild(newScript);
     };
     window.setInterval("SceneJS._moduleLoadTicker()", TICK_INTERVAL);
@@ -3573,12 +3956,40 @@ new (function() {
         }
     };
 
+    /* Same method as used on SceneJS.Instance - TODO: factor out to common utility method
+     *
+     * @private
+     */
+    SceneJS.UseModule.prototype._createTargetTraversalContext = function(traversalContext) {
+        this._superCallback = traversalContext.callback;
+        var _this = this;
+        if (!this._callback) {
+            this._callback = function(traversalContext, data) {
+                var subTraversalContext = {
+                    callback : _this._superCallback,
+                    insideRightFringe : _this._children.length > 1,
+                    configs: traversalContext.configs,
+                    configsModes: traversalContext.configsModes
+                };
+                _this._renderNodes(subTraversalContext, data);
+            };
+        }
+        return {
+            callback: this._callback,
+            insideRightFringe:  this._children.length > 1,
+            configs: traversalContext.configs,
+            configsModes: traversalContext.configsModes
+        };
+    };
+
     // @private
     SceneJS.UseModule.prototype._render = function(traversalContext, data) {
-        if (!this._fixedParams) {
+         if (!this._fixedParams) {
             this._init(this._getParams(data));
         }
+
         if (!this._moduleNode) {
+
             var module = modules[this._moduleName];
             if (module) {
                 this._moduleNode = module.getNode(this._moduleParams);
@@ -3593,8 +4004,8 @@ new (function() {
                 }
             }
         }
-        if (this._moduleNode) {
-            this._moduleNode._render(traversalContext, data);
+        if (this._moduleNode) {alert("rendering")
+            this._moduleNode._render(this._createTargetTraversalContext(traversalContext), data);
         }
         //this._renderNodes(traversalContext, data);
         ;
@@ -3659,7 +4070,8 @@ SceneJS._eventModule = new (function() {
     this.PROCESS_KILLED = 35;
     this.PROCESS_TIMED_OUT = 36;
     this.LOGGING_ELEMENT_ACTIVATED = 37;
-
+    this.PICK_COLOR_EXPORTED = 38;
+    
     /* Priority queue for each type of event
      */
     var events = new Array(37);
@@ -4309,16 +4721,30 @@ SceneJS._instancingModule = new function() {
                 countInstances = 0;
             });
 
+    /** Set current SID path
+     */
     this.setName = function(restore) {
-         this._nameStack = restore.nameStack.slice(0);
+        this._nameStack = restore.nameStack.slice(0);
         this._namePath = restore.namePath;
+
+        SceneJS._eventModule.fireEvent(
+                SceneJS._eventModule.NAME_UPDATED,
+                this._nameStack);
     };
 
-    this.pushName = function(name, node) {
+    /** Push node SID to current path
+     */
+    this.pushName = function(name) {
         this._nameStack.push(name);
         this._namePath = null;
+
+        SceneJS._eventModule.fireEvent(
+                SceneJS._eventModule.NAME_UPDATED,
+                this._nameStack);
     };
 
+    /** Get current SID path
+     */
     this.getName = function() {
         return {
             nameStack : this._nameStack.slice(0),
@@ -4326,6 +4752,8 @@ SceneJS._instancingModule = new function() {
         };
     };
 
+    /** Register Symbol against given SID path
+     */
     this.createSymbol = function(name, symbol) {
         if (!this._namePath) {
             this._namePath = this._nameStack.join("/");
@@ -4333,6 +4761,8 @@ SceneJS._instancingModule = new function() {
         this._symbols[this._namePath ? this._namePath + "/" + name : name] = symbol;
     };
 
+    /** Get Symbol registered against given SID path
+     */
     this.getSymbol = function(name) {
         if (!this._namePath) {
             this._namePath = this._nameStack.join("/");
@@ -4340,6 +4770,8 @@ SceneJS._instancingModule = new function() {
         return this._symbols[getPath(this._namePath, name)];
     };
 
+    /** Acquire instance of Symbol on given SID path
+     */
     this.acquireInstance = function(name) {
         if (!this._namePath) {
             this._namePath = this._nameStack.join("/");
@@ -4351,18 +4783,38 @@ SceneJS._instancingModule = new function() {
         return symbol;
     };
 
+    /**
+     * Query if any Symbols are currently being instanced - useful
+     * for determining if certain memoisation tricks can be done safely by nodes
+     */
     this.instancing = function() {
         return countInstances > 0;
     };
 
+    /**
+     * Release current Symbol instance, effectively reacquires any
+     * previously acquired
+     */
     this.releaseInstance = function() {
         countInstances--;
     };
 
+    /** Pop node SID off current path
+     */
     this.popName = function() {
         this._nameStack.pop();
         this._namePath = null;
+
+        /* Broadcast new current SID path. Not amazingly efficient since we'd do this alot,
+         * but potentially there are many other modules that might be interested in it and SID
+         * path should be managed in one place (module) - perhaps not instancing module's job,
+         * should be factored out into a "SID path module" maybe.
+         */
+        SceneJS._eventModule.fireEvent(
+                SceneJS._eventModule.NAME_UPDATED,
+                this._nameStack);
     };
+
 
     /**
      * Returns concatenation of base and relative paths
@@ -4635,7 +5087,7 @@ SceneJS.Instance.prototype._changeState = function(newState, exception) {
     var oldState = this._state;
     this._state = newState;
     if (this._listeners["state-changed"]) { // Optimisation
-        this._fireEvent("state-changed", { oldState: oldState, newState: newState, exception : exception });
+        this.fireEvent("state-changed", { oldState: oldState, newState: newState, exception : exception });
     }
 };
 
@@ -4652,7 +5104,6 @@ SceneJS.Instance.prototype._changeState = function(newState, exception) {
  * @private
  */
 SceneJS.Instance.prototype._createTargetTraversalContext = function(traversalContext, target) {
-    var callback;
     this._superCallback = traversalContext.callback;
     var _this = this;
     if (!this._callback) {
@@ -4687,54 +5138,50 @@ SceneJS.Instance.prototype._createTargetTraversalContext = function(traversalCon
  * @param data
  * @private
  */
-SceneJS.Instance.prototype._renderNodes = function(traversalContext, data) {
-    var numChildren = this._children.length;
-    var child;
-    var childConfigs;
-    var configUnsetters;
-
-    if (numChildren == 0) {
-
-        /* Instance has no child nodes - render super-Instance's child nodes
-         * through callback if one is passed in
-         */
-        if (traversalContext.callback) {
-            traversalContext.callback(traversalContext, data);
-        }
-
-    } else {
-
-        /* Instance has child nodes - last node in Instance's subtree will invoke
-         * the callback, if any (from within its SceneJS.Node#_renderNodes)
-         */
-        for (var i = 0; i < numChildren; i++) {
-            child = this._children[i];
-
-            childConfigs = traversalContext.configs;
-            configUnsetters = null;
-
-            if (childConfigs && child._sid) {
-                childConfigs = traversalContext.configs["#" + child._sid];
-                if (childConfigs) {
-                    configUnsetters = this._setConfigs(childConfigs, child);
-                }
-            }
-
-            var childTraversalContext = {
-                insideRightFringe : (i < numChildren - 1),
-                callback : traversalContext.callback,
-                configs : childConfigs || traversalContext.configs,
-                configsModes : traversalContext.configsModes
-            };
-
-            child._render.call(child, childTraversalContext, data);
-
-            if (configUnsetters) {
-                this._unsetConfigs(configUnsetters);
-            }
-        }
-    }
-};
+//SceneJS.Instance.prototype._renderNodes = function(traversalContext, data) {    
+//    var numChildren = this._children.length;
+//    var child;
+//    var childConfigs;
+//    var configUnsetters;
+//
+//    if (numChildren == 0) {
+//
+//        /* Instance has no child nodes - render super-Instance's child nodes
+//         * through callback if one is passed in
+//         */
+//        if (traversalContext.callback) {
+//            traversalContext.callback(traversalContext, data);
+//        }
+//
+//    } else {
+//
+//        /* Instance has child nodes - last node in Instance's subtree will invoke
+//         * the callback, if any (from within its SceneJS.Node#_renderNodes)
+//         */
+//        var childTraversalContext;
+//        for (var i = 0; i < numChildren; i++) {
+//            child = this._children[i];
+//            configUnsetters = null;
+//            childConfigs = traversalContext.configs;
+//            if (childConfigs && child._sid) {
+//                childConfigs = childConfigs[child._sid];
+//                if (childConfigs) {
+//                    configUnsetters = this._setConfigs(childConfigs, child);
+//                }
+//            }
+//            childTraversalContext = {
+//                insideRightFringe : (i < numChildren - 1),
+//                callback : traversalContext.callback,
+//                configs : childConfigs || traversalContext.configs,
+//                configsModes : traversalContext.configsModes
+//            };
+//            child._renderWithEvents.call(child, childTraversalContext, data);
+//            if (configUnsetters) {
+//                this._unsetConfigs(configUnsetters);
+//            }
+//        }
+//    }
+//};
 
 /** Instances a Symbol that is currently defined after being rendered prior to this Instance
  *
@@ -5155,7 +5602,6 @@ SceneJS._sceneModule = new (function() {
 
     var projMat;
     var viewMat;
-    var picking;
 
     SceneJS._eventModule.addListener(
             SceneJS._eventModule.RESET,
@@ -5164,10 +5610,6 @@ SceneJS._sceneModule = new (function() {
                 nScenes = 0;
                 activeSceneId = null;
             });
-
-    // @private
-    function updatePick() {
-    }
 
     SceneJS._eventModule.addListener(
             SceneJS._eventModule.PROJECTION_TRANSFORM_UPDATED,
@@ -5236,7 +5678,7 @@ SceneJS._sceneModule = new (function() {
                 SceneJS._loggingModule.info("SceneJS.Scene binding to canvas '" + canvasId + "'");
             } else {
                 SceneJS._loggingModule.info("SceneJS.Scene config 'canvasId' unresolved - looking for default canvas with " +
-                                           "ID '" + SceneJS.Scene.DEFAULT_CANVAS_ID + "'");
+                                            "ID '" + SceneJS.Scene.DEFAULT_CANVAS_ID + "'");
                 canvasId = SceneJS.Scene.DEFAULT_CANVAS_ID;
                 canvas = document.getElementById(canvasId);
                 if (!canvas) {
@@ -5249,10 +5691,13 @@ SceneJS._sceneModule = new (function() {
         var context;
         var contextNames = SceneJS.SUPPORTED_WEBGL_CONTEXT_NAMES;
         for (var i = 0; (!context) && i < contextNames.length; i++) {
-            try {
+            try {            
                 if (SceneJS._debugModule.getConfigs("webgl.logTrace") == true) {
+
                     context = canvas.getContext(contextNames[i]);
                     if (context) {
+                       // context = WebGLDebugUtils.makeDebugContext(context);
+
                         context = WebGLDebugUtils.makeDebugContext(
                                 context,
                                 function(err, functionName, args) {
@@ -5261,6 +5706,8 @@ SceneJS._sceneModule = new (function() {
                                             " on WebGL canvas context - see console log for details");
                                 });
                         context.setTracing(true);
+                        
+
                     }
                 } else {
                     context = canvas.getContext(contextNames[i]);
@@ -5287,8 +5734,6 @@ SceneJS._sceneModule = new (function() {
             canvasId : canvasId
         };
     }
-
-    ;
 
     /** Registers a scene, finds it's canvas, and returns the ID under which the scene is registered
      * @private
@@ -5341,7 +5786,7 @@ SceneJS._sceneModule = new (function() {
         }
         activeSceneId = sceneId;
         SceneJS._eventModule.fireEvent(SceneJS._eventModule.LOGGING_ELEMENT_ACTIVATED, { loggingElement: scene.loggingElement });
-        SceneJS._eventModule.fireEvent(SceneJS._eventModule.SCENE_RENDERING, { sceneId: sceneId });
+        SceneJS._eventModule.fireEvent(SceneJS._eventModule.SCENE_RENDERING, { sceneId: sceneId, canvas : scene.canvas });
         SceneJS._eventModule.fireEvent(SceneJS._eventModule.CANVAS_ACTIVATED, scene.canvas);
 
     };
@@ -5399,11 +5844,7 @@ SceneJS._sceneModule = new (function() {
         SceneJS._eventModule.fireEvent(SceneJS._eventModule.SCENE_RENDERED, {sceneId : sceneId });
         //SceneJS._loggingModule.info("Scene deactivated: " + sceneId);
     };
-
-}
-
-        )
-        ();
+})();
 /**
  *@class Root node of a SceneJS scene graph.
  *
@@ -5508,7 +5949,6 @@ SceneJS.Scene = function() {
     this._params = this._getParams();
     this._data = {};
     this._configs = {};
-    this._lastRenderedData = null;
     if (this._params.canvasId) {
         this._canvasId = document.getElementById(this._params.canvasId) ? this._params.canvasId : SceneJS.Scene.DEFAULT_CANVAS_ID;
     } else {
@@ -5576,7 +6016,7 @@ SceneJS.Scene.prototype.getConfigs = function() {
 
 /**
  * Renders the scene, applying any config and data scope values given to {@link #setData} and {#link setConfigs},
- * then clearing those values afterwards.
+ * retaining those values in the scene afterwards.
  */
 SceneJS.Scene.prototype.render = function() {
     if (!this._sceneId) {
@@ -5586,44 +6026,25 @@ SceneJS.Scene.prototype.render = function() {
     var traversalContext = {};
     this._renderNodes(traversalContext, new SceneJS.Data(null, false, this._data));
     SceneJS._sceneModule.deactivateScene();
-    this._lastRenderedData = this._data;
-    this._data = {};
-    this._configs = {};
 };
 
 /**
- * Performs pick on rendered scene and returns path to picked geometry, if any. The path is the
- * concatenation of the names specified by SceneJS.name nodes on the path to the picked geometry.
- * The scene must have been previously rendered, since this method re-renders it (to a special
- * pick frame buffer) using parameters retained from the prior render() call.
+ * Renders the scene while picking whatever is rendered at the given canvas coordinates.
+ * If a node is picked, then all nodes on the traversal path to that node
+ * that have "picked" listeners will receive a "picked" event as they are rendered.
  *
- * @param canvasX
- * @param canvasY
+ * @param canvasX Canvas X-coordinate
+ * @param canvasY Canvas Y-coordinate
  */
-//SceneJS.Scene.prototype.pick = function(canvasX, canvasY) {
-//    if (this._sceneId) {
-//        try {
-//            if (!this._lastRenderedData) {
-//                throw new SceneJS.errors.PickWithoutRenderedException
-//                        ("Scene not rendered - need to render before picking");
-//            }
-//            SceneJS._sceneModule.activateScene(this._sceneId);  // Also activates canvas
-//            SceneJS._pickModule.pick(canvasX, canvasY);
-//            if (this._params.loadProxy) {
-//                SceneJS._loadModule.setLoadProxyUri(this._params.proxy);
-//            }
-//            var traversalContext = {};
-//            this._renderNodes(traversalContext, this._lastRenderedData);
-//            SceneJS._loadModule.setLoadProxyUri(null);
-//            var picked = SceneJS._pickModule.getPicked();
-//            SceneJS._sceneModule.deactivateScene();
-//            return picked;
-//        } finally {
-//            SceneJS._traversalMode = SceneJS._TRAVERSAL_MODE_RENDER;
-//        }
-//    }
-//};
-
+SceneJS.Scene.prototype.pick = function(canvasX, canvasY) {
+    if (!this._sceneId) {
+        throw new SceneJS.errors.InvalidSceneGraphException
+                ("Attempted pick on Scene that has been destroyed or not yet rendered");
+    }
+    SceneJS._pickModule.pick(canvasX, canvasY); // Enter pick mode
+    this.render();  // Pick-mode traversal, resets to render-mode afterwards
+    this.render();  // Render-mode traversal
+};
 
 /**
  * Returns count of active processes. A non-zero count indicates that the scene should be rendered
@@ -5736,6 +6157,8 @@ SceneJS.reset = function() {
  */
 SceneJS._shaderModule = new (function() {
 
+    var debugCfg;
+
     var time = (new Date()).getTime();      // For LRU caching
 
     /* Resources contributing to shader
@@ -5784,6 +6207,7 @@ SceneJS._shaderModule = new (function() {
     SceneJS._eventModule.addListener(
             SceneJS._eventModule.SCENE_RENDERING,
             function() {
+                debugCfg = SceneJS._debugModule.getConfigs("shading");
                 canvas = null;
                 rendererState = null;
                 activeProgram = null;
@@ -5866,7 +6290,7 @@ SceneJS._shaderModule = new (function() {
                     activeProgram.bindTexture("uSampler" + i, layer.texture, i);
                     if (layer.params.matrixAsArray) {
                         activeProgram.setUniform("uLayer" + i + "Matrix", layer.params.matrixAsArray);
-                    }           
+                    }
                 }
             });
 
@@ -5951,6 +6375,16 @@ SceneJS._shaderModule = new (function() {
                 activeProgram.setUniform("uMaterialAlpha", m.alpha);
             });
 
+    /**
+     * When in pick mode, then with the pick fragment shader loaded, we'll get the
+     * pick color instead of a material
+     */
+     SceneJS._eventModule.addListener(
+            SceneJS._eventModule.PICK_COLOR_EXPORTED,
+            function(p) {
+                activeProgram.setUniform("uPickColor", p.pickColor);
+            });
+
     SceneJS._eventModule.addListener(
             SceneJS._eventModule.FOG_UPDATED,
             function(f) {
@@ -5971,10 +6405,8 @@ SceneJS._shaderModule = new (function() {
     SceneJS._eventModule.addListener(
             SceneJS._eventModule.MODEL_TRANSFORM_EXPORTED,
             function(transform) {
-
                 activeProgram.setUniform("uMMatrix", transform.matrixAsArray);
                 activeProgram.setUniform("uMNMatrix", transform.normalMatrixAsArray);
-
             });
 
     SceneJS._eventModule.addListener(
@@ -6112,12 +6544,11 @@ SceneJS._shaderModule = new (function() {
      * @private
      */
     function generateHash() {
-        if (SceneJS._traversalMode == SceneJS.TRAVERSAL_MODE_PICKING) {
+        if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
             sceneHash = ([canvas.canvasId, "picking"]).join(";");
         } else {
             sceneHash = ([canvas.canvasId, rendererHash, fogHash, lightsHash, textureHash, geometryHash]).join(";");
         }
-        //      SceneJS._loggingModule.debug("Scene shading hash:" + sceneHash);
     }
 
     /**
@@ -6154,7 +6585,7 @@ SceneJS._shaderModule = new (function() {
      * @private
      */
     function composePickingVertexShader() {
-        return [
+        var src = [
             "attribute vec3 aVertex;",
             "uniform mat4 uMMatrix;",
             "uniform mat4 uVMatrix;",
@@ -6162,7 +6593,11 @@ SceneJS._shaderModule = new (function() {
             "void main(void) {",
             "  gl_Position = uPMatrix * (uVMatrix * (uMMatrix * vec4(aVertex, 1.0)));",
             "}"
-        ].join("\n");
+        ];
+        if (debugCfg.logScripts == true) {
+            SceneJS._loggingModule.info(src);
+        }
+        return src.join("\n");
     }
 
     /**
@@ -6170,19 +6605,20 @@ SceneJS._shaderModule = new (function() {
      * @private
      */
     function composePickingFragmentShader() {
-        var g = parseFloat(Math.round((10 + 1) / 256) / 256);
-        var r = parseFloat((10 - g * 256 + 1) / 256);
+//        var g = parseFloat(Math.round((10 + 1) / 256) / 256);  // TODO: use exported pick color
+//        var r = parseFloat((10 - g * 256 + 1) / 256);
         var src = [
-            "uniform vec3 uColor;",
+            "uniform vec3 uPickColor;",
             "void main(void) {",
-
-            "gl_FragColor = vec4(" + (r.toFixed(17)) + ", " + (g.toFixed(17)) + ",1.0,1.0);",
-
-            //      "    gl_FragColor = vec4(uColor.rgb, 1.0);  ",
+            //"gl_FragColor = vec4(" + (r.toFixed(17)) + ", " + (g.toFixed(17)) + ",1.0,1.0);",
+                  "    gl_FragColor = vec4(uPickColor.rgb, 1.0);  ",
+              //  "    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);  ",
             "}"
-        ].join("\n");
-
-        return src;
+        ];
+        if (debugCfg.logScripts == true) {
+            SceneJS._loggingModule.info(src);
+        }
+        return src.join("\n");
     }
 
 
@@ -6286,7 +6722,7 @@ SceneJS._shaderModule = new (function() {
             }
         }
         src.push("}");
-        if (SceneJS._debugModule.getConfigs("shading.logScripts") == true) {
+        if (debugCfg.logScripts == true) {
             SceneJS._loggingModule.info(src);
         }
         return src.join("\n");
@@ -6296,7 +6732,7 @@ SceneJS._shaderModule = new (function() {
      * @private
      */
     function composeRenderingFragmentShader() {
-        var texturing = textureLayers.length > 0  && (geometry.uvBuf || geometry.uvBuf2);
+        var texturing = textureLayers.length > 0 && (geometry.uvBuf || geometry.uvBuf2);
         var lighting = (lights.length > 0 && geometry.normalBuf);
 
         var src = ["\n"];
@@ -6527,11 +6963,11 @@ SceneJS._shaderModule = new (function() {
         } else {
             src.push("gl_FragColor = fragColor;");
         }
-        if (SceneJS._debugModule.getConfigs("shading.whitewash") == true) {
+        if (debugCfg.whitewash == true) {
             src.push("gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);");
         }
         src.push("}");
-        if (SceneJS._debugModule.getConfigs("shading.logScripts") == true) {
+        if (debugCfg.logScripts == true) {
             SceneJS._loggingModule.info(src);
         }
         return src.join("\n");
@@ -15880,12 +16316,9 @@ SceneJS._inherit(SceneJS.Scale, SceneJS.Node);
  * @returns {SceneJS.Scale} this
  */
 SceneJS.Scale.prototype.setXYZ = function(xyz) {
-    var x = xyz.x || 0;
-    var y = xyz.y || 0;
-    var z = xyz.z || 0;
-    this._x = x;
-    this._y = y;
-    this._z = z;
+    this._x = (xyz.x != undefined) ? xyz.x : 0;
+    this._y = (xyz.y != undefined) ? xyz.y : 0;
+    this._z = (xyz.z != undefined) ? xyz.z : 0;
     this._memoLevel = 0;
     return this;
 };
@@ -15907,7 +16340,7 @@ SceneJS.Scale.prototype.getXYZ = function() {
  * @returns {SceneJS.Scale} this
  */
 SceneJS.Scale.prototype.setX = function(x) {
-    this._x = x;
+    this._x = (x != undefined) ? x : 1.0;
     this._memoLevel = 0;
     return this;
 };
@@ -15926,7 +16359,7 @@ SceneJS.Scale.prototype.getX = function() {
  * @returns {SceneJS.Scale} this
  */
 SceneJS.Scale.prototype.setY = function(y) {
-    this._y = y;
+    this._y = (y != undefined) ? y : 1.0;
     this._memoLevel = 0;
     return this;
 };
@@ -15945,7 +16378,7 @@ SceneJS.Scale.prototype.getY = function() {
  * @returns {SceneJS.Scale} this
  */
 SceneJS.Scale.prototype.setZ = function(z) {
-    this._z = z;
+    this._z = (z != undefined) ? z : 1.0;
     this._memoLevel = 0;
     return this;
 };
@@ -16914,6 +17347,14 @@ SceneJS.Camera.prototype._render = function(traversalContext, data) {
         if (this._optics.type == "ortho") {
             this._transform = {
                 type: this._optics.type,
+                optics : {
+                    left: this._optics.left,
+                    right: this._optics.right,
+                    bottom: this._optics.bottom,
+                    top: this._optics.top,
+                    near: this._optics.near,
+                    far : this._optics.far
+                },
                 matrix:SceneJS._math_orthoMat4c(
                         this._optics.left,
                         this._optics.right,
@@ -16925,6 +17366,14 @@ SceneJS.Camera.prototype._render = function(traversalContext, data) {
         } else if (this._optics.type == "frustum") {
             this._transform = {
                 type: this._optics.type,
+                optics : {
+                    left: this._optics.left,
+                    right: this._optics.right,
+                    bottom: this._optics.bottom,
+                    top: this._optics.top,
+                    near: this._optics.near,
+                    far : this._optics.far
+                },
                 matrix:SceneJS._math_frustumMatrix4(
                         this._optics.left,
                         this._optics.right,
@@ -16936,6 +17385,12 @@ SceneJS.Camera.prototype._render = function(traversalContext, data) {
         } else if (this._optics.type == "perspective") {
             this._transform = {
                 type: this._optics.type,
+                optics : {
+                    fovy: this._optics.fovy,
+                    aspect: this._optics.aspect,
+                    near: this._optics.near,
+                    far: this._optics.far
+                },
                 matrix:SceneJS._math_perspectiveMatrix4(
                         this._optics.fovy * Math.PI / 180.0,
                         this._optics.aspect,
@@ -17510,7 +17965,7 @@ SceneJS.Lights.prototype._init = function(params) {
 
 // @private
 SceneJS.Lights.prototype._render = function(traversalContext, data) {
-    if (SceneJS._traversalMode == SceneJS.TRAVERSAL_MODE_PICKING) {
+    if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
         this._renderNodes(traversalContext, data);
     } else {
         if (!this._fixedParams) {
@@ -17862,7 +18317,7 @@ SceneJS.Material.prototype._init = function(params) {
 
 // @private
 SceneJS.Material.prototype._render = function(traversalContext, data) {
-    if (SceneJS._traversalMode == SceneJS.TRAVERSAL_MODE_PICKING) {
+    if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
         this._renderNodes(traversalContext, data);
     } else {
         if (!this._fixedParams) {
@@ -18344,7 +18799,13 @@ SceneJS.withData = function() {
  * <p><b>Example 1:</b></p><p>Configuring properties on {@link SceneJS.Translation} and {@link SceneJS.Scale} nodes in the subgraph:</b></p><pre><code>
  * var wc = new SceneJS.WithConfigs({
  *
- *         // Have the WithConfigs throw a SceneJS.errors.WithConfigsNodeNotFoundException if any target node
+ *         // Optionally you can specify that the configs map is to be forgotten as soon as it is used,
+ *         // where the WithConfigs node only applies it the first time it is rendered, before clearing it.
+ *         // In this case, our WithConfigs applies it every time:
+ *
+ *         once : false,
+ *
+ *         // Optionally have the WithConfigs throw a SceneJS.errors.WithConfigsNodeNotFoundException if any target node
  *         // is not found at exactly the hierarchy position specified in our configs map.
  *         //
  *         // Default is false, which would allow unmatched nodes to be simply skipped as traversal
@@ -18469,6 +18930,7 @@ SceneJS.WithConfigs = function() {
     SceneJS.Node.apply(this, arguments);
     this._nodeType = "with-configs";
     this._configs = {};
+    this._once = false;
     this._configsModes = {
         strictProperties : true,
         strictNodes : false
@@ -18485,8 +18947,11 @@ SceneJS._inherit(SceneJS.WithConfigs, SceneJS.Node);
  @param {Object} configs The configs map
  @returns {SceneJS.WithConfigs} this
  */
-SceneJS.WithConfigs.prototype.setConfigs = function(configs) {
+SceneJS.WithConfigs.prototype.setConfigs = function(configs, once) {
     this._configs = configs;
+    if (once != undefined) {
+        this._once = once;
+    }
     this._memoLevel = 0;
     return this;
 };
@@ -18498,6 +18963,29 @@ SceneJS.WithConfigs.prototype.setConfigs = function(configs) {
  */
 SceneJS.WithConfigs.prototype.getConfigs = function() {
     return this._configs;
+};
+
+/**
+ Sets whether the configs map is forgotten as soon as the node has rendered, ie. to apply only once.
+ @param {boolean} once - Will forget when this is true
+ @returns {SceneJS.WithConfigs} this
+ */
+SceneJS.WithConfigs.prototype.setOnce = function(once) {
+    this._once = once;
+    if (once != undefined) {
+        this._once = once;
+    }
+    this._memoLevel = 0;
+    return this;
+};
+
+/**
+ * Sets whether the configs map is forgotten as soon as the node has rendered, ie. to apply only once.
+ *
+ * @returns {boolean} True if to forget, else false
+ */
+SceneJS.WithConfigs.prototype.getOnce = function() {
+    return this._once;
 };
 
 /**
@@ -18538,6 +19026,7 @@ SceneJS.WithConfigs.prototype.getStrictNodes = function() {
 
 SceneJS.WithConfigs.prototype._init = function(params) {
     this._configs = params.configs || {};
+     this._once = params.once != undefined ? params.once : false;
 };
 
 SceneJS.WithConfigs.prototype._render = function(traversalContext, data) {
@@ -18550,19 +19039,23 @@ SceneJS.WithConfigs.prototype._render = function(traversalContext, data) {
             this._configs = this._preprocessConfigs(this._configs);
         }
     }
-//    if (this._memoLevel < 2) {
-//        if (this._memoLevel == 1 && data.isFixed() && !SceneJS._instancingModule.instancing()) {
-//            this._memoLevel = 2;
-//        }
-//    }
+    //    if (this._memoLevel < 2) {
+    //        if (this._memoLevel == 1 && data.isFixed() && !SceneJS._instancingModule.instancing()) {
+    //            this._memoLevel = 2;
+    //        }
+    //    }
     traversalContext = {
         appendix : traversalContext.appendix,
         insideRightFringe: this._children.length > 1,
         configs : this._configs,
         configsModes : this._configsModes
     };
-   // this._renderNodes(traversalContext, new SceneJS.Data(data, this._fixedParams, this._data));
+    // this._renderNodes(traversalContext, new SceneJS.Data(data, this._fixedParams, this._data));
     this._renderNodes(traversalContext, data);
+
+    if (this._once) {
+        this._configs = {};
+    }
 };
 
 
@@ -18745,7 +19238,7 @@ SceneJS._frustumModule = new (function() {
 
     SceneJS._eventModule.addListener(
             SceneJS._eventModule.VIEW_TRANSFORM_UPDATED,
-            function(params) {
+            function(params) {               
                 viewMat = params.matrix;
                 frustum = null;
             });
@@ -19634,6 +20127,7 @@ SceneJS._textureModule = new (function() {
                                 logging: SceneJS._loggingModule
                             });
                         } catch (e) {
+                             throw SceneJS._errorModule.fatalError("Failed to create texture: \"" + uri + "\" : " + e);
                         }
                     });
             SceneJS._processModule.killProcess(process);
@@ -19984,7 +20478,7 @@ SceneJS.Texture.prototype._render = function(traversalContext, data) {
      * Render this node
      *-----------------------------------------------*/
 
-    if (SceneJS._traversalMode == SceneJS.TRAVERSAL_MODE_PICKING) {
+    if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
         this._renderNodes(traversalContext, data);
     } else {
 
@@ -20316,7 +20810,7 @@ SceneJS.Fog.prototype._init = function(params) {
 
 // @private
 SceneJS.Fog.prototype._render = function(traversalContext, data) {
-    if (SceneJS._traversalMode == SceneJS.TRAVERSAL_MODE_PICKING) {
+    if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
         this._renderNodes(traversalContext, data);
     } else {
         if (!this._fixedParams) {
@@ -20900,3 +21394,297 @@ SceneJS.socket = function() {
     SceneJS.Socket.prototype.constructor.apply(n, arguments);
     return n;
 };
+/* Backend that manages picking
+ *
+ *
+ *
+ *  @private
+ */
+SceneJS._pickModule = new (function() {
+    var scenePickBufs = {};            // Pick buffer for each existing scene
+    var boundPickBuf = null;           // Pick buffer for currently active scene while picking
+    var color = { r: 0, g: 0, b: 0 };
+    var sidStack = [];
+    var nodeArray = [];
+    var pickX = null;
+    var pickY = null;
+    var debugCfg = null;
+    var rootObserver = null;
+    var leafObserver = null;
+    var nodeIndex = 0;
+    var pickedNodeIndex = 0;
+
+    /**
+     * On init, put SceneJS in rendering mode.
+     * Pick buffers are destroyed when their scenes are destroyed.
+     */
+    SceneJS._eventModule.addListener(
+            SceneJS._eventModule.INIT,
+            function() {
+                SceneJS._traversalMode = SceneJS._TRAVERSAL_MODE_RENDER;
+                debugCfg = SceneJS._debugModule.getConfigs("pick"); // TODO: debug mode only changes on reset
+                scenePickBufs = {};
+                boundPickBuf = null;
+            });
+
+    /** Make sure we are back in render mode on error/reset
+     */
+    SceneJS._eventModule.addListener(
+            SceneJS._eventModule.RESET,
+            function() {
+                SceneJS._traversalMode = SceneJS._TRAVERSAL_MODE_RENDER;
+            });
+
+    /** Called by SceneJS.Scene to pick at x,y and enter picking mode.
+     */
+    this.pick = function(x, y) {
+        if (debugCfg.logTrace) {
+            SceneJS._loggingModule.info("Picking at (" + x + ", " + y + ")");
+        }
+        SceneJS._traversalMode = SceneJS._TRAVERSAL_MODE_PICKING;
+        pickX = x;
+        pickY = y;
+        color = { r: 0, g: 0, b: 0 };
+        nodeIndex = 0;
+        sidStack = [];
+        rootObserver = null;
+        leafObserver = null;
+    };
+
+    /**
+     * When a scene begins rendering, then if in pick mode, bind pick buffer for scene,
+     * creating buffer first if not existing
+     */
+    SceneJS._eventModule.addListener(
+            SceneJS._eventModule.SCENE_RENDERING,
+            function(e) {
+                if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
+                    if (!scenePickBufs[e.sceneId]) {
+                        scenePickBufs[e.sceneId] = createPickBuffer(e.canvas);
+                    }
+                    bindPickBuffer(scenePickBufs[e.sceneId]);
+                }
+            });
+
+    function createPickBuffer(canvas) {
+        var gl = canvas.context;
+        var width = canvas.canvas.width;
+        var height = canvas.canvas.height;
+
+        var pickBuf = {
+            canvas : canvas,
+            frameBuf : gl.createFramebuffer(),
+            renderBuf : gl.createRenderbuffer(),
+            texture : gl.createTexture()
+        };
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, pickBuf.frameBuf);
+
+        gl.bindTexture(gl.TEXTURE_2D, pickBuf.texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        try {
+            // Do it the way the spec requires
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+        } catch (exception) {
+            // Workaround for what appears to be a Minefield bug.
+            var textureStorage = new WebGLUnsignedByteArray(width * height * 3);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, textureStorage);
+        }
+        gl.bindRenderbuffer(gl.RENDERBUFFER, pickBuf.renderBuf);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pickBuf.texture, 0);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, pickBuf.renderBuf);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        /* Verify framebuffer is OK
+         */
+        gl.bindFramebuffer(gl.FRAMEBUFFER, pickBuf.frameBuf);
+        if (!gl.isFramebuffer(pickBuf.frameBuf)) {
+            throw("Invalid framebuffer");
+        }
+        var status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        switch (status) {
+            case gl.FRAMEBUFFER_COMPLETE:
+                break;
+            case gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                throw("Incomplete framebuffer: FRAMEBUFFER_INCOMPLETE_ATTACHMENT");
+            case gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                throw("Incomplete framebuffer: FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT");
+            case gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+                throw("Incomplete framebuffer: FRAMEBUFFER_INCOMPLETE_DIMENSIONS");
+            case gl.FRAMEBUFFER_UNSUPPORTED:
+                throw("Incomplete framebuffer: FRAMEBUFFER_UNSUPPORTED");
+            default:
+                throw("Incomplete framebuffer: " + status);
+        }
+        return pickBuf;
+    }
+
+    function bindPickBuffer(pickBuf) {
+        if (debugCfg.logTrace) {
+            SceneJS._loggingModule.info("Binding pick buffer");
+        }
+        var context = pickBuf.canvas.context;
+        context.bindFramebuffer(context.FRAMEBUFFER, pickBuf.frameBuf);
+        context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+        context.disable(context.BLEND);
+        boundPickBuf = pickBuf;
+    }
+
+    /** Push SID to path, map next unique colour to path and node
+     */
+    this.preVisitNode = function(node) {
+        if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) { // Quietly igore if not picking
+
+            /* Save node with SID
+             */
+            var sid = node.getSID();
+            if (sid) {
+                sidStack.push(sid);
+
+                color.g = parseFloat(Math.round((nodeIndex + 1) / 256) / 256);
+                color.r = parseFloat((nodeIndex - color.g * 256 + 1) / 256);
+                color.b = 1.0;
+
+                if (nodeArray.length <= nodeIndex) {
+                    nodeArray.push({});
+                }
+                nodeArray[nodeIndex] = {
+                    node: node,
+                    sidStack : sidStack.slice(0),
+                    leafObserver : leafObserver
+                };
+                if (debugCfg.logTrace) {
+                    SceneJS._loggingModule.info(
+                            "Mapping pick index to node: " + nodeIndex + " => " + sidStack.join("/"));
+                }
+                nodeIndex++;
+            }
+
+            /* Track pick event observer
+             */
+            if (node.hasListener("picked")) {
+                leafObserver = {             // TODO: reuse same observer records from pool array
+                    node: node,
+                    sidDepth: sidStack.length, // Depth of observer node in SID namespace
+                    parent : leafObserver
+                };
+                if (!rootObserver) {
+                    rootObserver = leafObserver;
+                }
+                if (debugCfg.logTrace) {
+                    SceneJS._loggingModule.info(
+                            "Registering node as \"picked\" event listener: SID path = {" + sidStack.join("/") + "}");
+                }
+            }
+        }
+    };
+
+    /** Export the current pick color when requested by shader module
+     */
+    SceneJS._eventModule.addListener(
+            SceneJS._eventModule.SHADER_RENDERING,
+            function() {
+                if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
+                    SceneJS._eventModule.fireEvent(
+                            SceneJS._eventModule.PICK_COLOR_EXPORTED, { pickColor: [color.r,color.g,color.b]});
+                }
+            });
+
+    /** Pop SID off path
+     */
+    this.postVisitNode = function(node) {
+        if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) { // Quietly igore if not picking
+            sidStack.pop();
+            if (node.hasListener("picked")) {
+                leafObserver = leafObserver.parent;
+                if (!leafObserver) {
+                    rootObserver = null;
+                }
+            }
+        }
+    };
+
+    /** When scene finished rendering, then if in pick mode, read and unbind pick buffer
+     */
+    SceneJS._eventModule.addListener(
+            SceneJS._eventModule.SCENE_RENDERED,
+            function() {
+                if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
+                    readPickBuffer();
+                    unbindPickBuffer();
+                }
+            });
+
+
+    function readPickBuffer() {
+        var context = boundPickBuf.canvas.context;
+        var pix = context.readPixels(pickX, boundPickBuf.canvas.canvas.height - pickY, 1, 1, context.RGB, context.UNSIGNED_BYTE);
+        if (!pix) {  //  http://asalga.wordpress.com/2010/07/14/compensating-for-webgl-readpixels-spec-changes/
+            pix = new WebGLUnsignedByteArray(3);
+            context.readPixels(pickX, boundPickBuf.canvas.height - pickY, 1, 1, context.RGB, context.UNSIGNED_BYTE, pix);
+        }
+        if (debugCfg.logTrace) {
+            SceneJS._loggingModule.info("Reading pick buffer - picked pixel(" + pickX + ", " + pickY + ") = {r:" + pix[0] + ", g:" + pix[1] + ", b:" + pix[2] + "}");
+        }
+        pickedNodeIndex = (pix[0] + pix[1] * 256) - 1;
+    }
+
+    function unbindPickBuffer() {
+        if (debugCfg.logTrace) {
+            SceneJS._loggingModule.info("Unbinding pick buffer");
+        }
+        boundPickBuf.canvas.context.bindFramebuffer(boundPickBuf.canvas.context.FRAMEBUFFER, null);
+        boundPickBuf = null;
+    }
+
+    /**
+     * When a scene finished rendering in pick mode, find picked node and fire "picked" event at
+     * each node on path back to root that is listening for "picked" events.
+     */
+    SceneJS._eventModule.addListener(
+            SceneJS._eventModule.SCENE_RENDERED,
+            function() {
+                if (SceneJS._traversalMode == SceneJS._TRAVERSAL_MODE_PICKING) {
+                    if (debugCfg.logTrace) {
+                        SceneJS._loggingModule.info("Finished rendering..");
+                    }
+                    var picked = nodeArray[pickedNodeIndex];
+                    if (picked) {
+                        for (var observer = picked.leafObserver; observer != null; observer = observer.parent) {
+
+                            /* Path to picked node, relative to the observer node
+                             */
+                            var relSIDPath = picked.sidStack.slice(observer.sidDepth).join("/");
+                            if (debugCfg.logTrace) {
+                                SceneJS._loggingModule.info("Node was picked - SID path:" + relSIDPath);
+                            }
+                            var pickedEvent = { uri : relSIDPath };
+                            if (debugCfg.logTrace) {
+                                SceneJS._loggingModule.info("Notifying \"picked\" event observer");
+                            }
+                            observer.node.addEvent("picked", pickedEvent);
+                        }
+                    } else {
+                        if (debugCfg.logTrace) {
+                            SceneJS._loggingModule.info("No nodes picked");
+                        }
+                    }
+                    SceneJS._traversalMode = SceneJS._TRAVERSAL_MODE_RENDER;
+                }
+            });
+
+    SceneJS._eventModule.addListener(
+            SceneJS._eventModule.SCENE_DESTROYED,
+            function(e) {
+                if (debugCfg.logTrace) {
+                    SceneJS._loggingModule.info("Destroying pick buffer");
+                }
+            });
+})();

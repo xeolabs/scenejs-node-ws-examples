@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <title></title>
+    <script type="text/javascript" src="../libs/scenejs.min.js"></script>
+</head>
+<body>
+<table>
+    <tr>
+        <td valign="top">
+            <canvas id="theCanvas" width="600" height="600">
+                <p>This example requires a browser that supports the
+                    <a href="http://www.w3.org/html/wg/html5/">HTML5</a>
+                    &lt;canvas&gt; feature.</p>
+            </canvas>
+        </td>
+        <td valign="top">
+            <h1>SceneJS WebSockets Example 2</h1>
+
+            <h2>Sending Pick Events through a WebSocket</h2>
+            <hr/>
+            <p>Click on a teapot to change it's color. When you do that, a <a
+                    href="http://scenejs.wikispaces.com/SceneJS.Socket">SceneJS.Socket</a> within
+                the <a href="scene.js">scene graph</a> catches the pick event and fires a request at the WebSocket
+                server for
+                a new random colour for the picked teapot.</p>
+
+            <p>The server responds with a config map containing a new colour for the picked teapot. The Socket then
+                pushes the config down
+                into the Material node for the teapot.</p>
+            <hr/>
+            <h3>SceneJS Log:</h3>
+
+            <div id="theLoggingDiv"></div>
+        </td>
+    </tr>
+</table>
+
+<script type="text/javascript" src="scene.js"></script>
+</body>
+</html>

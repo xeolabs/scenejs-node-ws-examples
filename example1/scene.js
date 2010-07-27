@@ -61,20 +61,24 @@ var exampleScene = SceneJS.scene({
 
                                         SceneJS.socket({
                                             uri: "ws://127.0.0.1:8888/",   // Should transition to STATE_CONNECTING then STATE_OPEN
+                                            //  uri: "ws://184.106.205.99:8888/",
 
                                             /* Messages to send as soon as the socket is first opened.
                                              */
                                             messages: [
                                                 {
+                                                    exampleId : "example1",
                                                     cmd: "createTeapot"
                                                 },
 
                                                 {
+                                                    exampleId : "example1",
                                                     cmd: "rotateTeapot"
                                                 }
 
                                                 //  ,
                                                 //  {
+                                                //       exampleId : "ex1",
                                                 //       cmd: "destroyTeapot"
                                                 //  }
                                             ],

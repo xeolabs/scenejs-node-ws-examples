@@ -15,11 +15,12 @@ these examples as I figure out what it's meant to be!
 
 ## Running
 
-To run the first example:
+All the examples run through the same WebSocket server.
+Start the server like this:
 
 node example1/server.js
 
-Then point your browser at http://.../example1/index.html
+To run the first example, point your browser at example1/index.html.
 
 You'll see a teapot appear as the server pushes it into the scene graph, then rotate when the
 server pushes fresh attributes into its subgraph. Nothing flash, but hey it works!  
