@@ -1753,12 +1753,12 @@ SceneJS._webgl_ProgramUniform = function(context, program, name, type, size, loc
         throw "Unsupported shader uniform type: " + type;
     }
 
-        /** @private */
+    /** @private */
     this.setValue = function(v) {
         func(v);
     };
 
-        /** @private */
+    /** @private */
     this.getValue = function() {
         return context.getUniform(program, location);
     };
@@ -1881,25 +1881,33 @@ SceneJS._webgl_Program = function(hash, lastUsed, context, vertexSources, fragme
 
     var numUniforms = context.getProgramParameter(handle, context.ACTIVE_UNIFORMS);
 
+    /* Patch for http://code.google.com/p/chromium/issues/detail?id=40175)  where
+     * gl.getActiveUniform was producing uniform names that had a trailing NUL in Chrome 6.0.466.0 dev
+     * Issue ticket at: https://xeolabs.lighthouseapp.com/projects/50643/tickets/124-076-live-examples-blank-canvas-in-chrome-5037599
+     */
     for (var i = 0; i < numUniforms; ++i) {
         var u = context.getActiveUniform(handle, i);
         if (u) {
-            var location = context.getUniformLocation(handle, u.name);
+            var u_name = u.name;
+            if (u_name[u_name.length - 1] == "\u0000") {
+                u_name = u_name.substr(0, u_name.length - 1);
+            }
+            var location = context.getUniformLocation(handle, u_name);
             if ((u.type == context.SAMPLER_2D) || (u.type == context.SAMPLER_CUBE) || (u.type == 35682)) {
 
-                samplers[u.name] = new SceneJS._webgl_ProgramSampler(
+                samplers[u_name] = new SceneJS._webgl_ProgramSampler(
                         context,
                         handle,
-                        u.name,
+                        u_name,
                         u.type,
                         u.size,
                         location,
                         logging);
             } else {
-                uniforms[u.name] = new SceneJS._webgl_ProgramUniform(
+                uniforms[u_name] = new SceneJS._webgl_ProgramUniform(
                         context,
                         handle,
-                        u.name,
+                        u_name,
                         u.type,
                         u.size,
                         location,
@@ -2004,9 +2012,9 @@ SceneJS._webgl_Texture2D = function(context, cfg) {
 
         /* Texture from image
          */
-       context.texImage2D(context.TEXTURE_2D, 0, cfg.image, cfg.flipY);
+        context.texImage2D(context.TEXTURE_2D, 0, cfg.image, cfg.flipY);
 
-       // context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, cfg.image);
+        // context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, context.RGBA, context.UNSIGNED_BYTE, cfg.image);
 
         this.format = context.RGBA;
         this.width = cfg.image.width;
@@ -2142,17 +2150,17 @@ SceneJS._webgl_ArrayBuffer = function(context, type, values, numItems, itemSize,
     this.itemSize = itemSize;
 
 
-        /** @private */
+    /** @private */
     this.bind = function() {
         context.bindBuffer(type, this.handle);
     };
 
-        /** @private */
+    /** @private */
     this.unbind = function() {
         context.bindBuffer(type, null);
     };
 
-        /** @private */
+    /** @private */
     this.destroy = function() {
         context.deleteBuffer(this.handle);
     };
@@ -3112,8 +3120,6 @@ SceneJS.Data = function(_parent, _fixed, _data) {
  * constructor on a static config object, or at any time on a node instance through its {@link #addListener} method.</p>
  * <p><b>Registering listeners on configuration</b></p>
  * <p>The example below creates a {@link SceneJS.Instance} node, with a "state-changed" listener registered through its constructor.
- * See how the listener can have an optional <b>options</b> object, which in this case specifies the JavaScript scope on
- * which to invoke the handler function.</p>
  * <pre><code>
  * var myLoad = new SceneJS.Instance({
  *
@@ -3121,12 +3127,9 @@ SceneJS.Data = function(_parent, _fixed, _data) {
  *
  *                  listeners: {
  *                        "state-changed" : {
- *                                fn: function(node, params) {
- *                                       alert("Node " + node.getType() + " has changed state to " + params.newState);
- *                                    },
- *                                options: {
- *                                    scope: this            // Optional scope for handler call, defaults to this
- *                                }
+ *                                fn: function(params) {
+ *                                       alert("Node " + this.getType() + " has changed state to " + params.newState);
+ *                                    }
  *                         }
  *                  }
  *             }
@@ -3135,17 +3138,11 @@ SceneJS.Data = function(_parent, _fixed, _data) {
  * <p><b>Registering and de-registering listeners on node instances</b></p>
  * <p>This example registers a "state-changed" listener on an existing instance of the node, then removes it again:</p>
  * <pre><code>
- * var handler = function(node, params) {
- *                  alert("Node " + node.getType() + " has changed state to " + node.getState());
+ * var handler = function(params) {
+ *                  alert("Node " + this.getType() + " has changed state to " + this.getState());
  *              };
  *
- * myLoad.addListener("state-changed", handler,
- *
- *              // Listener options
- *
- *              {
- *                    scope: this
- *              });
+ * myLoad.addListener("state-changed", handler);
  *
  * myLoad.removeListener("state-changed", handler);
  * </code></pre>
@@ -3206,6 +3203,10 @@ SceneJS.Node._ArgParser = new (function() {
          */
         if (args.length > 0) {
             var arg = args[0];
+            if (!arg) {
+                throw SceneJS._errorModule.fatalError(new SceneJS.errors.InvalidNodeConfigException
+                        ("First element in node config is null or undefined"));
+            }
             if (arg instanceof Function) {
                 this._parseConfigFunc(arg, args, 1, node);
             } else if (arg._render) {   // Determines arg to be a node
@@ -3353,6 +3354,10 @@ SceneJS.Node._ArgParser = new (function() {
         arg._resetMemoLevel(); // In case child is a pruned and grafted subgraph
         if (i < args.length) {
             arg = args[i];
+            if (!arg) {
+                throw SceneJS._errorModule.fatalError(new SceneJS.errors.InvalidNodeConfigException
+                        ("Node argument " + i + " is null or undefined"));
+            }
             if (arg._nodeType) {
                 this._parseChild(arg, args, i + 1, node);
             } else {
@@ -3415,7 +3420,11 @@ SceneJS.Node.prototype._renderNodes = function(traversalContext, data, children)
             if (childConfigs && child._sid) {
                 childConfigs = childConfigs[child._sid];
                 if (childConfigs) {
-                    configUnsetters = this._setConfigs(childConfigs, traversalContext.configsModes, child, data);
+                    if (childConfigs instanceof Function) {
+                        childConfigs.call(child, data);
+                    } else {
+                        configUnsetters = this._setConfigs(childConfigs, traversalContext.configsModes, child, data);
+                    }
                 }
             }
             childTraversalContext = {
@@ -3510,7 +3519,7 @@ SceneJS.Node.prototype._renderWithEvents = function(traversalContext, data) {
 /** @private */
 SceneJS.Node.prototype._render = function(traversalContext, data) {
     if (!this._fixedParams) {
-        this._init(this._getParams(data));
+        this._init(this._getParams.call(this, data));
     }
     this._renderNodes(traversalContext, data);
 };
@@ -3637,6 +3646,11 @@ SceneJS.Node.prototype.removeNodeAt = function(index) {
  * @returns {SceneJS.Node} The removed child node if located, else null
  */
 SceneJS.Node.prototype.removeNode = function(sid) {
+    if (!sid) {
+        throw SceneJS._errorModule.fatalError(
+                new SceneJS.errors.InvalidSceneGraphException(
+                        "SceneJS.Node#removeNode - target node not defined"));
+    }
     for (var i = 0; i < this._children.length; i++) {
         if (this._children[i].getSID() == sid) {
             return this.removeNodeAt(i);
@@ -3670,6 +3684,56 @@ SceneJS.Node.prototype.addNode = function(node) {
     node._resetMemoLevel();
     return node;
 };
+//
+///** Attaches a new child node as a spliced parent of an existing target child
+// * @param {string} sid SID of target child node
+// * @param {SceneJS.Node} node Node to splice
+// * @return {SceneJS.Node} The spliced node
+// */
+//SceneJS.Node.prototype.spliceNode = function(sid, node) {
+//    if (!sid) {
+//        throw SceneJS._errorModule.fatalError(
+//                new SceneJS.errors.InvalidSceneGraphException(
+//                        "SceneJS.Node#spliceNode - target node not defined"));
+//    }
+//    var targetNodeIndex = this._findNodeIndex(sid);
+//    if (targetNodeIndex == -1) {
+//        new SceneJS.errors.InvalidSceneGraphException(
+//                "SceneJS.Node#spliceNode - target node not found with this SID: '" + sid + "'");
+//    }
+//    if (!node) {
+//        throw SceneJS._errorModule.fatalError(
+//                new SceneJS.errors.InvalidSceneGraphException(
+//                        "SceneJS.Node#spliceNode - node argument is undefined"));
+//    }
+//    if (node._parent != null) {
+//        throw SceneJS._errorModule.fatalError(
+//                new SceneJS.errors.InvalidSceneGraphException(
+//                        "SceneJS.Node#spliceNode - node to splice is still attached to another parent!"));
+//    }
+//    var targetNode = this._children[targetNodeIndex];
+//
+//    this._children[targetNodeIndex] = node;
+//    node._parent = this;
+//
+//    node._children.push(targetNode);
+//    targetNode._parent = node;
+//
+//    node._resetMemoLevel();
+//    targetNode._resetMemoLevel();
+//    return node;
+//};
+
+/** @private
+ */
+SceneJS.Node.prototype.findNodeIndex = function(sid) {
+    for (var i = 0; i < this._children.length; i++) {
+        if (this._children[i].getSID() == sid) {
+            return i;
+        }
+    }
+    return -1;
+};
 
 /** Inserts a child node
  * @param {SceneJS.Node} node Child node
@@ -3695,6 +3759,9 @@ SceneJS.Node.prototype.insertNode = function(node, i) {
     return node;
 };
 
+
+
+
 /**
  * Registers a listener for a given event on this node. If the event type
  * is not supported by this node type, then the listener will never be called.
@@ -3712,13 +3779,6 @@ SceneJS.Node.prototype.insertNode = function(node, i) {
  *                       params) {  // Whatever params accompany the event type
  *
  *                     // ...
- *              },
- *
- *              // options
- *              {
- *                     // Optional scope on which handler is
- *                     // called - default is this
- *                     scope: this
  *              }
  * );
  *
@@ -3757,7 +3817,7 @@ SceneJS.Node.prototype._fireEvent = function(eventName, params) {
         }
         for (var i = 0; i < list.length; i++) {
             var listener = list[i];
-            listener.fn.call(listener.options.scope || this, this, params);
+            listener.fn.call(this, params);
         }
     }
 };
@@ -3879,25 +3939,32 @@ new (function() {
     var moduleQueue = [];
     var moduleLoading = null;
     var modules = {};
-    var moduleLoadTimer = 0;
+    var moduleLoadTimer = 0;    
 
     SceneJS.requireModule = function(url) {
-        moduleQueue.unshift({ url : url });
+    //    moduleQueue.unshift({ url : url + "&x=" + (new Date()).getTime() }); // defeat caching
+         moduleQueue.unshift({ url : url  }); // defeat caching
     };
 
+    /** Called by each module after it has eval-ed on arrival
+     *
+     * @param name Name under which module registers itself on SceneJS
+     * @param module Module itself
+     */
     SceneJS.installModule = function(name, module) {
-        try {
-           //  alert("installing " + moduleLoading.url + " as " + name);
-            if (module.init) {
-                module.init({ baseURL : SceneJS._getBaseURL(moduleLoading.url) });
+        if (moduleLoading) {
+            try {
+                if (module.init) {
+                    module.init({ baseURL : SceneJS._getBaseURL(moduleLoading.url) });
+                }
+                modules[name] = module;
+            } catch (e) {
+                throw SceneJS._errorModule.fatalError(
+                        new SceneJS.errors.ModuleInstallFailureException(
+                                "Module install failed - " + moduleLoading.url + ": " + e));
+            } finally {
+                moduleLoading = null;
             }
-            modules[name] = module;
-        } catch (e) {
-            throw SceneJS._errorModule.fatalError(
-                    new SceneJS.errors.ModuleInstallFailureException(
-                            "Module install failed - " + moduleLoading.url + ": " + e));
-        } finally {
-            moduleLoading = null;
         }
     };
 
@@ -3920,17 +3987,16 @@ new (function() {
 
         /* Load next module
          */
-        moduleLoading = moduleQueue.pop();
+        moduleLoading = moduleQueue.pop();   
         moduleLoadTimer = 0;
 
         var headID = document.getElementsByTagName("head")[0];
         var newScript = document.createElement('script');
         newScript.type = 'text/javascript';
         newScript.src = moduleLoading.url;
-        // alert("loading " + moduleLoading.url);
         headID.appendChild(newScript);
     };
-    window.setInterval("SceneJS._moduleLoadTicker()", TICK_INTERVAL);
+    window.setInterval(SceneJS._moduleLoadTicker, TICK_INTERVAL);
 
 
     SceneJS.UseModule = function() {
@@ -3960,7 +4026,7 @@ new (function() {
      *
      * @private
      */
-    SceneJS.UseModule.prototype._createTargetTraversalContext = function(traversalContext) {
+    SceneJS.UseModule.prototype._createTargetTraversalContext = function(traversalContext, target) {
         this._superCallback = traversalContext.callback;
         var _this = this;
         if (!this._callback) {
@@ -3976,21 +4042,66 @@ new (function() {
         }
         return {
             callback: this._callback,
-            insideRightFringe:  this._children.length > 1,
+            insideRightFringe:  target._children.length > 1,
             configs: traversalContext.configs,
             configsModes: traversalContext.configsModes
         };
     };
 
+    //    SceneJS.UseModule.prototype._renderNodes = function(traversalContext, data) {
+    //        var numChildren = this._children.length;
+    //        var child;
+    //        var childConfigs;
+    //        var configUnsetters;
+    //
+    //        if (numChildren == 0) {
+    //
+    //            /* Instance has no child nodes - render super-Instance's child nodes
+    //             * through callback if one is passed in
+    //             */
+    //            if (traversalContext.callback) {
+    //                traversalContext.callback(traversalContext, data);
+    //            }
+    //
+    //        } else {
+    //
+    //            /* Instance has child nodes - last node in Instance's subtree will invoke
+    //             * the callback, if any (from within its SceneJS.Node#_renderNodes)
+    //             */
+    //            var childTraversalContext;
+    //            for (var i = 0; i < numChildren; i++) {
+    //                child = this._children[i];
+    //                configUnsetters = null;
+    //                childConfigs = traversalContext.configs;
+    //                if (childConfigs && child._sid) {
+    //                    childConfigs = childConfigs[child._sid];
+    //                    if (childConfigs) {
+    //                        configUnsetters = this._setConfigs(childConfigs, child);
+    //                    }
+    //                }
+    //                childTraversalContext = {
+    //                    insideRightFringe : (i < numChildren - 1),
+    //                    callback : traversalContext.callback,
+    //                    configs : childConfigs || traversalContext.configs,
+    //                    configsModes : traversalContext.configsModes
+    //                };
+    //                child._renderWithEvents.call(child, childTraversalContext, data);
+    //                if (configUnsetters) {
+    //                    this._unsetConfigs(configUnsetters);
+    //                }
+    //            }
+    //        }
+    //    };
+
     // @private
     SceneJS.UseModule.prototype._render = function(traversalContext, data) {
-         if (!this._fixedParams) {
+        if (!this._fixedParams) {
             this._init(this._getParams(data));
         }
 
         if (!this._moduleNode) {
 
-            var module = modules[this._moduleName];
+            var module = modules[this._moduleName]; 
             if (module) {
                 this._moduleNode = module.getNode(this._moduleParams);
             } else {
@@ -4004,8 +4115,8 @@ new (function() {
                 }
             }
         }
-        if (this._moduleNode) {alert("rendering")
-            this._moduleNode._render(this._createTargetTraversalContext(traversalContext), data);
+        if (this._moduleNode) {
+            this._moduleNode._render(this._createTargetTraversalContext(traversalContext, this._moduleNode), data);
         }
         //this._renderNodes(traversalContext, data);
         ;
@@ -5848,8 +5959,8 @@ SceneJS._sceneModule = new (function() {
 /**
  *@class Root node of a SceneJS scene graph.
  *
- * <p>This is entry and exit point for execution when rendering one frame of a scene graph, while also providing
- * the means to configure global data scope values and configurations for each frame. </p>
+ * <p>This is entry and exit point for traversal of a scene graph, providing the means to inject data, pick 
+ * {@link SceneJS.Geometry} and render frames either singularly or in a continuous loop.</p>
  * <p><b>Binding to a canvas</b></p>
  * <p>The Scene node can be configured with a <b>canvasId</b> property to specify the ID of a WebGL compatible Canvas
  * element for the scene to render to. When that is omitted, the node will look for one with the default ID of
@@ -5936,6 +6047,29 @@ SceneJS._sceneModule = new (function() {
  * take an immutable data object, which is SceneJS's mechanism for passing variables down into scene graphs. Using the
  * yaw and pitch properties on that data object, our functions create configurations that specify rotations about
  * the X and Y axis. See also how we inject those angles when we render the scene.</p>
+ * <h2>Rendering in a Loop</h2>
+ * <p>If you wanted to animate the rotation within the scene example above, then instead of rendering just a single frame
+ * you could start a rendering loop on the scene, as shown below:</p>
+ * <pre><code>
+ *    var yaw = 0.0;
+ *    var pitch = 20.0
+ *
+ *    myScene.start({
+ *
+ *        // Idle function called before each render traversal
+ *
+ *        idleFunc: function(scene) {
+ *             scene.setData({ yaw: yaw, pitch: 20 };
+ *
+ *             yaw += 2.0;
+ *             if (yaw == 360) {
+ *                 scene.stop();
+ *             }
+ *        },
+ *
+ *        fps: 20
+ * });
+ * </code></pre>
  * @extends SceneJS.Node
  */
 SceneJS.Scene = function() {
@@ -5974,10 +6108,89 @@ SceneJS.Scene.prototype.getCanvasId = function() {
 };
 
 /**
- * Sets a map of values to set on the global scene data scope. This data will then be available
- * to any configuration callbacks that are used to configure nodes. The map is the same as that
- * configured on a {@link SceneJS.WithData} and works the same way. The given values will be forgotten
- * when the scene is next rendered with {@link #render}.
+ * Starts the scene rendering repeatedly in a loop. After this {@link #isRunning} will return true, and you can then stop it again
+ * with {@link #stop}. You can specify an idleFunc that will be called within each iteration before the scene graph is
+ * traversed for the next frame. You can also specify the desired number of frames per second to render, which SceneJS
+ * will attempt to achieve.
+ *
+ * To render just one frame at a time, use {@link #render}.
+ *
+ * <p><b>Usage Example: Basic Loop</b></p><p>Here we are rendering a scene in a loop, at each frame feeding some data into it
+ * (see main {@link SceneJS.Scene} comment for more info on that), then stopping the loop after ten frames are rendered:</p>
+ *
+ * <pre><code>
+ * var n = 0;
+ * myScene.start({
+ *     idleFunc: function(scene) {
+ *
+ *         scene.setData({ someData: 5, moreData: 10 };
+ *
+ *         n++;
+ *         if (n == 100) {
+ *             scene.stop();
+ *         }
+ *     },
+ *     fps: 20
+ * });
+ * </code></pre>
+ *
+ *
+ * <p><b>Usage Example: Picking</b></p><p>The snippet below shows how to do picking via the idle function, where we
+ * retain the mouse click event in some variables which are collected when the idleFunc is next called. The idleFunc
+ * then puts the scene into picking mode for the next traversal. Then any {@link SceneJS.Geometry} intersecting the
+ * canvas-space coordinates during that traversal will fire a "picked" event to be observed by "picked" listeners at
+ * higher nodes (see examples, wiki etc. for the finer details of picking). After the traversal, the scene will be back
+ * "rendering" mode again.</p>
+ *
+ * <pre><code>
+ * var clicked = false;
+ * var clickX, clickY;
+ *
+ * canvas.addEventListener('mousedown',
+ *     function (event) {
+ *         clicked = true;
+ *         clickX = event.clientX;
+ *         clickY = event.clientY;
+ * }, false);
+ *
+ * myScene.start({
+ *     idleFunc: function(scene) {
+ *         if (clicked) {
+ *             scene.pick(clickX, clickY);
+ *             clicked = false;
+ *         }
+ *     }
+ * });
+ * </code></pre>
+ * @param cfg
+ */
+SceneJS.Scene.prototype.start = function(cfg) {
+    if (!this._running) {
+        this._running = true;
+        var self = this;
+        var fnName = "__scenejs_renderScene" + this._sceneId;
+        window[fnName] = function() {
+            if (cfg.idleFunc) {
+                cfg.idleFunc(self);
+            }
+            if (self._running) { // idleFunc may have stopped render loop
+                self.render();
+            }
+        };
+        this._pInterval = setInterval("window['" + fnName + "']()", 1000.0 / (cfg.fps || 10));
+    }
+};
+
+/** Returns true if the scene is currently rendering repeatedly in a loop after being started with {@link #start}.
+ */
+SceneJS.Scene.prototype.isRunning = function() {
+    return this._running;
+};
+
+/**
+ * Sets a map of values to set on the global scene data scope when the scene is next rendered.
+ * This data will then be available to any configuration callbacks that are used to configure nodes. The map is the same
+ * as that configured on a {@link SceneJS.WithData} and works the same way.
  * @param {object} values Values for the global scene data scope, same format as that given to {@link SceneJS.WithData}
  */
 SceneJS.Scene.prototype.setData = function(values) {
@@ -5995,9 +6208,8 @@ SceneJS.Scene.prototype.getData = function() {
 };
 
 /**
- * Sets a map of values to set on nodes in the scene graph as they are rendered. The map is the same as that
- * configured on a {@link SceneJS.WithConfigs} and works the same way. The given values will be forgotten
- * when the scene is next rendered with {@link #render}.
+ * Sets a map of values to set on target nodes in the scene graph when the scene is next rendered. The map is the same as that
+ * configured on a {@link SceneJS.WithConfigs} and works the same way.
  * @param {object} values Map of values, same format as that given to {@link SceneJS.WithConfigs}
  */
 SceneJS.Scene.prototype.setConfigs = function(values) {
@@ -6006,7 +6218,7 @@ SceneJS.Scene.prototype.setConfigs = function(values) {
 };
 
 /**
- * Returns any config values map previously set with {@link #setConfigs} since the last call to {@link #render}.
+ * Returns the config values map that was last set with {@link #setConfigs}.
  *
  * @returns {Object} The config values map
  */
@@ -6015,10 +6227,19 @@ SceneJS.Scene.prototype.getConfigs = function() {
 };
 
 /**
- * Renders the scene, applying any config and data scope values given to {@link #setData} and {#link setConfigs},
- * retaining those values in the scene afterwards.
+ * Immediately renders one frame of the scene, applying any config and data scope values given to {@link #setData} and
+ * {#link #setConfigs}, retaining those values in the scene afterwards. Has no effect if the scene has been
+ * {@link #start}ed and is currently rendering in a loop.
  */
 SceneJS.Scene.prototype.render = function() {
+    if (!this._running) {
+        this._render();
+    }
+};
+
+/** @private
+ */
+SceneJS.Scene.prototype._render = function() {
     if (!this._sceneId) {
         this._sceneId = SceneJS._sceneModule.createScene(this, this._getParams());
     }
@@ -6029,9 +6250,11 @@ SceneJS.Scene.prototype.render = function() {
 };
 
 /**
- * Renders the scene while picking whatever is rendered at the given canvas coordinates.
- * If a node is picked, then all nodes on the traversal path to that node
- * that have "picked" listeners will receive a "picked" event as they are rendered.
+ * Picks whatever {@link SceneJS.Geometry} will be rendered at the given canvas coordinates. When this is called within
+ * the idle function of a currently running render loop (ie. started with {@link #start) then pick will be performed on
+ * the next render. When called on a non-running scene, the pick is performed immediately.
+ * When a node is picked (hit), then all nodes on the traversal path to that node that have "picked" listeners will
+ * receive a "picked" event as they are rendered (see examples and wiki for more info).
  *
  * @param canvasX Canvas X-coordinate
  * @param canvasY Canvas Y-coordinate
@@ -6042,8 +6265,10 @@ SceneJS.Scene.prototype.pick = function(canvasX, canvasY) {
                 ("Attempted pick on Scene that has been destroyed or not yet rendered");
     }
     SceneJS._pickModule.pick(canvasX, canvasY); // Enter pick mode
-    this.render();  // Pick-mode traversal, resets to render-mode afterwards
-    this.render();  // Render-mode traversal
+    if (!this._running) {
+        this._render(); // Pick-mode traversal - get picked element and fire events
+        this._render(); // Render-mode traversal - process events with listeners while drawing
+    }
 };
 
 /**
@@ -6060,10 +6285,12 @@ SceneJS.Scene.prototype.getNumProcesses = function() {
 /** Destroys this scene. You should destroy
  * a scene as soon as you are no longer using it, to ensure that SceneJS does not retain
  * resources for it (eg. shaders, VBOs etc) that are no longer in use. A destroyed scene
- * becomes un-destroyed as soon as you render it again.
+ * becomes un-destroyed as soon as you render it again. If the scene is currently rendering in a loop (after a call
+ * to {@link #start}) then the loop is stopped.
  */
 SceneJS.Scene.prototype.destroy = function() {
     if (this._sceneId) {
+        this.stop();
         SceneJS._sceneModule.destroyScene(this._sceneId); // Last one fires RESET command
         this._sceneId = null;
     }
@@ -6074,6 +6301,16 @@ SceneJS.Scene.prototype.destroy = function() {
  */
 SceneJS.Scene.prototype.isActive = function() {
     return (this._sceneId != null);
+};
+
+/** Stops current render loop that was started with {@link #start}. After this, {@link #isRunning} will return false.
+ */
+SceneJS.Scene.prototype.stop = function() {
+    if (this._running) {
+        this._running = false;
+        window["__scenejs_renderScene" + this._sceneId] = null;
+        window.clearInterval(this._pInterval);
+    }
 };
 
 /** Factory function that returns a new {@link SceneJS.Scene} instance
@@ -6103,37 +6340,6 @@ SceneJS.reset = function() {
     }
 };
 
-//
-//SceneJS._Visitor = (function() {
-//    this._nodeStack = new Object[5000];
-//    this._nStack = 0;
-//
-//
-//    this.visit = function(node, tc, data) {
-//        this._nodeStack[this._nStack++] = node;
-//        while (this._nStack > 0) {
-//            node = this._nodeStack[--this._nStack];
-//            node._visited = true;
-//            node._preRender(tc, data);
-//            for (var i = 0; i < node._children.length; i++) {
-//
-//            }
-//
-//        }
-//
-//
-//        node._preRender(tc, data);
-//        node._render(tc, data);
-//        node._postRender(tc, data);
-//    };
-//
-//    this.visitChildren = function(children, tc, data) {
-//        node._preRender(tc, data);
-//        node._render(tc, data);
-//
-//        node._postRender(tc, data);
-//    };
-//});
 /**
  * This module encapsulates shading behind an event API.
  *
@@ -6379,7 +6585,7 @@ SceneJS._shaderModule = new (function() {
      * When in pick mode, then with the pick fragment shader loaded, we'll get the
      * pick color instead of a material
      */
-     SceneJS._eventModule.addListener(
+    SceneJS._eventModule.addListener(
             SceneJS._eventModule.PICK_COLOR_EXPORTED,
             function(p) {
                 activeProgram.setUniform("uPickColor", p.pickColor);
@@ -6605,14 +6811,16 @@ SceneJS._shaderModule = new (function() {
      * @private
      */
     function composePickingFragmentShader() {
-//        var g = parseFloat(Math.round((10 + 1) / 256) / 256);  // TODO: use exported pick color
-//        var r = parseFloat((10 - g * 256 + 1) / 256);
+        //        var g = parseFloat(Math.round((10 + 1) / 256) / 256);  // TODO: use exported pick color
+        //        var r = parseFloat((10 - g * 256 + 1) / 256);
         var src = [
+            "#ifdef GL_ES",
+            "   precision highp float;",
+            "#endif",
+
             "uniform vec3 uPickColor;",
-            "void main(void) {",
-            //"gl_FragColor = vec4(" + (r.toFixed(17)) + ", " + (g.toFixed(17)) + ",1.0,1.0);",
-                  "    gl_FragColor = vec4(uPickColor.rgb, 1.0);  ",
-              //  "    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);  ",
+            "void main(void) {",,
+            "    gl_FragColor = vec4(uPickColor.rgb, 1.0);  ",
             "}"
         ];
         if (debugCfg.logScripts == true) {
@@ -6736,6 +6944,10 @@ SceneJS._shaderModule = new (function() {
         var lighting = (lights.length > 0 && geometry.normalBuf);
 
         var src = ["\n"];
+                
+        src.push("#ifdef GL_ES");
+        src.push("   precision highp float;");
+        src.push("#endif");
 
         src.push("varying vec4 vViewVertex;");              // View-space vertex
 
@@ -16069,6 +16281,9 @@ SceneJS.Rotate.prototype._init = function(params) {
 };
 
 SceneJS.Rotate.prototype._render = function(traversalContext, data) {
+
+    var origMemoLevel = this._memoLevel;
+
     if (this._memoLevel == 0) {
         if (!this._fixedParams) {
             this._init(this._getParams(data));
@@ -16088,24 +16303,26 @@ SceneJS.Rotate.prototype._render = function(traversalContext, data) {
             this._mat = SceneJS._math_identityMat4();
         }
     }
-    this._superXForm = SceneJS._modelViewTransformModule.getTransform();
-    if (this._memoLevel < 2) {
+    var superXForm = SceneJS._modelViewTransformModule.getTransform();
+    if (origMemoLevel < 2 || (!superXForm.fixed)) {
         var instancing = SceneJS._instancingModule.instancing();
-        var tempMat = SceneJS._math_mulMat4(this._superXForm.matrix, this._mat);
+        var tempMat = SceneJS._math_mulMat4(superXForm.matrix, this._mat);
+
         this._xform = {
             localMatrix: this._mat,
             matrix: tempMat,
-            fixed: this._superXForm.fixed && this._fixedParams && !instancing
+            fixed: origMemoLevel == 2
         };
-        if (this._memoLevel == 1 && this._superXForm.fixed && !instancing) {   // Bump up memoization level if model-space fixed
+
+        if (this._memoLevel == 1 && superXForm.fixed && !instancing) {   // Bump up memoization level if model-space fixed
             this._memoLevel = 2;
-        }
+        }        
     }
     SceneJS._modelViewTransformModule.setTransform(this._xform);
 
     this._renderNodes(traversalContext, data);
-    
-    SceneJS._modelViewTransformModule.setTransform(this._superXForm);
+
+    SceneJS._modelViewTransformModule.setTransform(superXForm);
 };
 
 /** Factory function that returns a new {@link SceneJS.Rotate} instance
@@ -16236,6 +16453,8 @@ SceneJS.Translate.prototype._init = function(params) {
 };
 
 SceneJS.Translate.prototype._render = function(traversalContext, data) {
+    var origMemoLevel = this._memoLevel;
+
     if (this._memoLevel == 0) {
         if (!this._fixedParams) {
             this._init(this._getParams(data));
@@ -16252,23 +16471,24 @@ SceneJS.Translate.prototype._render = function(traversalContext, data) {
             this._mat = SceneJS._math_translationMat4v([this._x, this._y, this._z]);
         }
     }
-    this._superXForm = SceneJS._modelViewTransformModule.getTransform();
-    if (this._memoLevel < 2) {
+    var superXForm = SceneJS._modelViewTransformModule.getTransform();
+    if (origMemoLevel < 2 || (!superXForm.fixed)) {
         var instancing = SceneJS._instancingModule.instancing();
-        
-        var tempMat = SceneJS._math_mulMat4(this._superXForm.matrix, this._mat);
+      
+        var tempMat = SceneJS._math_mulMat4(superXForm.matrix, this._mat);
         this._xform = {
             localMatrix: this._mat,
             matrix: tempMat,
-            fixed: this._superXForm.fixed && this._fixedParams && !instancing
+            fixed: origMemoLevel == 2
         };
-        if (this._memoLevel == 1 && this._superXForm.fixed && !instancing) {   // Bump up memoization level if model-space fixed
+
+        if (this._memoLevel == 1 && superXForm.fixed && !instancing) {   // Bump up memoization level if model-space fixed
             this._memoLevel = 2;
         }
     }
     SceneJS._modelViewTransformModule.setTransform(this._xform);
     this._renderNodes(traversalContext, data);
-    SceneJS._modelViewTransformModule.setTransform(this._superXForm);
+    SceneJS._modelViewTransformModule.setTransform(superXForm);
 };
 
 /** Factory function that returns a new {@link SceneJS.Translate} instance
@@ -16396,6 +16616,9 @@ SceneJS.Scale.prototype._init = function(params) {
 };
 
 SceneJS.Scale.prototype._render = function(traversalContext, data) {
+
+    var origMemoLevel = this._memoLevel;
+
     if (this._memoLevel == 0) {
         if (!this._fixedParams) {
             this._init(this._getParams(data));
@@ -16405,14 +16628,16 @@ SceneJS.Scale.prototype._render = function(traversalContext, data) {
         this._mat = SceneJS._math_scalingMat4v([this._x, this._y, this._z]);
     }
     var superXform = SceneJS._modelViewTransformModule.getTransform();
-    if (this._memoLevel < 2) {
+    if (origMemoLevel < 2 || (!superXform.fixed)) {
         var instancing = SceneJS._instancingModule.instancing();
+
         var tempMat = SceneJS._math_mulMat4(superXform.matrix, this._mat);
         this._xform = {
             localMatrix: this._mat,
             matrix: tempMat,
-            fixed: superXform.fixed && this._fixedParams && !instancing
+            fixed: origMemoLevel == 2
         };
+
         if (this._memoLevel == 1 && superXform.fixed && !instancing) {   // Bump up memoization level if model-space fixed
             this._memoLevel = 2;
         }
@@ -16498,6 +16723,8 @@ SceneJS.Matrix.prototype._init = function(params) {
 };
 
 SceneJS.Matrix.prototype._render = function(traversalContext, data) {
+    var origMemoLevel = this._memoLevel;
+
     if (this._memoLevel == 0) {
         if (!this._fixedParams) {
             this._init(this._getParams(data));
@@ -16506,7 +16733,7 @@ SceneJS.Matrix.prototype._render = function(traversalContext, data) {
         }
     }
     var superXform = SceneJS._modelViewTransformModule.getTransform();
-    if (this._memoLevel < 2) {
+    if (origMemoLevel < 2 || (!superXform.fixed)) {
         var instancing = SceneJS._instancingModule.instancing();
 
         /* When building a view transform, apply the inverse of the matrix
@@ -16515,13 +16742,15 @@ SceneJS.Matrix.prototype._render = function(traversalContext, data) {
         var mat = SceneJS._modelViewTransformModule.isBuildingViewTransform()
                 ? SceneJS._math_inverseMat4(this._mat)
                 : this._mat;
-        
+
         var tempMat = SceneJS._math_mulMat4(superXform.matrix, mat);
+
         this._xform = {
             localMatrix: this._mat,
             matrix: tempMat,
-            fixed: superXform.fixed && this._fixedParams && !instancing
+            fixed: origMemoLevel == 2
         };
+
         if (this._memoLevel == 1 && superXform.fixed && !instancing) {   // Bump up memoization level if model-space fixed
             this._memoLevel = 2;
         }
@@ -16743,6 +16972,8 @@ SceneJS.Quaternion.prototype._init = function(params) {
 };
 
 SceneJS.Quaternion.prototype._render = function(traversalContext, data) {
+    var origMemoLevel = this._memoLevel;
+
     if (this._memoLevel == 0) {
         if (!this._fixedParams) {
             this._init(this._getParams(data));
@@ -16752,14 +16983,16 @@ SceneJS.Quaternion.prototype._render = function(traversalContext, data) {
         this._mat = SceneJS._math_newMat4FromQuaternion(this._q);
     }
     var superXform = SceneJS._modelViewTransformModule.getTransform();
-    if (this._memoLevel < 2) {
+    if (origMemoLevel < 2 || (!superXform.fixed)) {
         var instancing = SceneJS._instancingModule.instancing();
         var tempMat = SceneJS._math_mulMat4(superXform.matrix, this._mat);
+
         this._xform = {
             localMatrix: this._mat,
             matrix: tempMat,
-            fixed: superXform.fixed && this._fixedParams && !instancing
+            fixed: origMemoLevel == 2
         };
+
         if (this._memoLevel == 1 && superXform.fixed && !instancing) {   // Bump up memoization level if model-space fixed
             this._memoLevel = 2;
         }
@@ -16917,6 +17150,8 @@ SceneJS.LookAt.prototype._init = function(params) {
 };
 
 SceneJS.LookAt.prototype._render = function(traversalContext, data) {
+    var origMemoLevel = this._memoLevel;
+
     if (this._memoLevel == 0) {
         if (!this._fixedParams) {
             this._init(this._getParams(data));
@@ -16929,8 +17164,10 @@ SceneJS.LookAt.prototype._render = function(traversalContext, data) {
                 this._upX, this._upY, this._upZ);
     }
     var superXform = SceneJS._modelViewTransformModule.getTransform();
-    if (this._memoLevel < 2) {
+    if (origMemoLevel < 2 || (!superXform.fixed)) {
+
         var tempMat = SceneJS._math_mulMat4(superXform.matrix, this._mat);
+
         this._xform = {
             type: "lookat",
             matrix: tempMat,
@@ -16939,8 +17176,9 @@ SceneJS.LookAt.prototype._render = function(traversalContext, data) {
                 look: { x: this._lookX, y: this._lookY, z: this._lookZ },
                 up:  { x: this._upX, y: this._upY, z: this._upZ }
             },
-            fixed: superXform.fixed && this._fixedParams
+            fixed: origMemoLevel == 2
         };
+        
         if (this._memoLevel == 1 && superXform.fixed && !SceneJS._instancingModule.instancing()) {   // Bump up memoization level if space fixed
             this._memoLevel = 2;
         }
@@ -16993,10 +17231,14 @@ SceneJS.Stationary = function() {
 SceneJS._inherit(SceneJS.Stationary, SceneJS.Node);
 
 SceneJS.Stationary.prototype._render = function(traversalContext, data) {
+
+    var origMemoLevel = this._memoLevel;
+
     var superXform = SceneJS._viewTransformModule.getTransform();
     var lookAt = superXform.lookAt;
     if (lookAt) {
-        if (this._memoLevel == 0) {
+        if (this._memoLevel == 0 || (!superXform.fixed)) {
+
             this._xform = {
                 matrix: SceneJS._math_mulMat4(
                         superXform.matrix,
@@ -17005,8 +17247,9 @@ SceneJS.Stationary.prototype._render = function(traversalContext, data) {
                                 lookAt.eye.y,
                                 lookAt.eye.z)),
                 lookAt: lookAt,
-                fixed: superXform.fixed
+                fixed: origMemoLevel == 1
             };
+
             if (superXform.fixed && !SceneJS._instancingModule.instancing()) {
                 this._memoLevel = 1;
             }
@@ -17057,18 +17300,22 @@ SceneJS.Inverse = function() {
 SceneJS._inherit(SceneJS.Inverse, SceneJS.Node);
 
 SceneJS.Inverse.prototype._render = function(traversalContext, data) {
+    var origMemoLevel = this._memoLevel;
+
     if (this._memoLevel == 0) {
         this._memoLevel = 1; // For consistency with other transform nodes
     }
     var superXform = SceneJS._modelViewTransformModule.getTransform();
-    if (this._memoLevel < 2) {
+    if (origMemoLevel < 2 || (!superXform.fixed)) {
         var instancing = SceneJS._instancingModule.instancing();
         var tempMat = SceneJS._math_inverseMat4(superXform.matrix, this._mat);
+
         this._xform = {
             localMatrix: this._mat,
             matrix: tempMat,
-            fixed: superXform.fixed && this._fixedParams && !instancing
+            fixed: origMemoLevel == 2
         };
+
         if (this._memoLevel == 1 && superXform.fixed && !instancing) {   // Bump up memoization level if model-space fixed
             this._memoLevel = 2;
         }
@@ -19026,7 +19273,7 @@ SceneJS.WithConfigs.prototype.getStrictNodes = function() {
 
 SceneJS.WithConfigs.prototype._init = function(params) {
     this._configs = params.configs || {};
-     this._once = params.once != undefined ? params.once : false;
+    this._once = params.once != undefined ? params.once : false;
 };
 
 SceneJS.WithConfigs.prototype._render = function(traversalContext, data) {
@@ -19084,7 +19331,11 @@ SceneJS.WithConfigs.prototype._preprocessConfigs = function(configs) {
                     };
 
                 } else {
-                    newConfigs[key.substr(1)] = this._preprocessConfigs(configs[key]);
+                    if (configs[key] instanceof Function) {
+                        newConfigs[key.substr(1)] = configs[key];
+                    } else {
+                        newConfigs[key.substr(1)] = this._preprocessConfigs(configs[key]);
+                    }
                 }
             }
         }
@@ -21124,7 +21375,7 @@ SceneJS._SocketModule = new (function() {
  *
  *      listeners: {
  *         "state-changed" : {
- *              fn: function(theNode, params) {
+ *              fn: function(params) {
  *                  switch (params.newState) {
  *                      case SceneJS.Socket.STATE_CONNECTING:
  *
@@ -21405,7 +21656,7 @@ SceneJS._pickModule = new (function() {
     var boundPickBuf = null;           // Pick buffer for currently active scene while picking
     var color = { r: 0, g: 0, b: 0 };
     var sidStack = [];
-    var nodeArray = [];
+    var nodeArray = new Array(1000);
     var pickX = null;
     var pickY = null;
     var debugCfg = null;
@@ -21422,7 +21673,7 @@ SceneJS._pickModule = new (function() {
             SceneJS._eventModule.INIT,
             function() {
                 SceneJS._traversalMode = SceneJS._TRAVERSAL_MODE_RENDER;
-                debugCfg = SceneJS._debugModule.getConfigs("pick"); // TODO: debug mode only changes on reset
+                debugCfg = SceneJS._debugModule.getConfigs("picking"); // TODO: debug mode only changes on reset
                 scenePickBufs = {};
                 boundPickBuf = null;
             });
@@ -21562,9 +21813,9 @@ SceneJS._pickModule = new (function() {
                 };
                 if (debugCfg.logTrace) {
                     SceneJS._loggingModule.info(
-                            "Mapping pick index to node: " + nodeIndex + " => " + sidStack.join("/"));
+                            "Mapping pick index to color/node: " + nodeIndex + " => {r:" + color.r + ", g:" + color.g + ", b:" + color.b + "} " + sidStack.join("/"));
                 }
-                nodeIndex++;
+                nodeIndex+=1;
             }
 
             /* Track pick event observer
@@ -21625,10 +21876,10 @@ SceneJS._pickModule = new (function() {
 
     function readPickBuffer() {
         var context = boundPickBuf.canvas.context;
-        var pix = context.readPixels(pickX, boundPickBuf.canvas.canvas.height - pickY, 1, 1, context.RGB, context.UNSIGNED_BYTE);
+        var pix = context.readPixels(pickX, boundPickBuf.canvas.canvas.height - pickY, 1, 1, context.RGBA, context.UNSIGNED_BYTE);
         if (!pix) {  //  http://asalga.wordpress.com/2010/07/14/compensating-for-webgl-readpixels-spec-changes/
-            pix = new WebGLUnsignedByteArray(3);
-            context.readPixels(pickX, boundPickBuf.canvas.height - pickY, 1, 1, context.RGB, context.UNSIGNED_BYTE, pix);
+            pix = new WebGLUnsignedByteArray(4);            
+            context.readPixels(pickX, boundPickBuf.canvas.canvas.height - pickY, 1, 1, context.RGBA, context.UNSIGNED_BYTE, pix);
         }
         if (debugCfg.logTrace) {
             SceneJS._loggingModule.info("Reading pick buffer - picked pixel(" + pickX + ", " + pickY + ") = {r:" + pix[0] + ", g:" + pix[1] + ", b:" + pix[2] + "}");

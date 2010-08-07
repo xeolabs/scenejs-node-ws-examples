@@ -60,8 +60,7 @@ var exampleScene = SceneJS.scene({
                                     //-------------------------------------------------------------------------------------
 
                                         SceneJS.socket({
-                                            uri: "ws://127.0.0.1:8888/",   // Should transition to STATE_CONNECTING then STATE_OPEN
-                                            //  uri: "ws://184.106.205.99:8888/",
+                                            uri: "ws://127.0.0.1:8888/",   // Should transition to STATE_CONNECTING then STATE_OPEN                                             
 
                                             /* Messages to send as soon as the socket is first opened.
                                              */
@@ -86,19 +85,19 @@ var exampleScene = SceneJS.scene({
                                             listeners: {
 
                                                 "msg-sent" : {
-                                                    fn: function(theNode, message) {
+                                                    fn: function(message) {
                                                         //alert(JSON.stringify(message));
                                                     }
                                                 },
 
                                                 "msg-received" : {
-                                                    fn: function(theNode, message) {
+                                                    fn: function(message) {
                                                         //alert(JSON.stringify(message.body.configs));
                                                     }
                                                 },
 
                                                 "state-changed" : {
-                                                    fn: function(theNode, params) {
+                                                    fn: function(params) {
                                                         switch (params.newState) {
                                                             case SceneJS.Socket.STATE_CONNECTING:
                                                                 // alert("STATE_CONNECTING");

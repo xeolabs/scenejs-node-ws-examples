@@ -60,8 +60,8 @@ var exampleScene = SceneJS.scene({
                                          * will be "teapot1-material", ""teapot2-material" or "teapot3-material".
                                          */
                                         "picked" : {
-                                            fn: function(self, params) {
-                                                self.addMessage({           // Socket queues message on itself
+                                            fn: function(params) {
+                                                this.addMessage({           // Socket queues message on itself
                                                     exampleId : "example2", // to send when next rendered
                                                     cmd: "changeColor",
                                                     targetNode : params.uri
